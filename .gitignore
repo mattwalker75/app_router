@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local configuration and credentials — never commit
+config.json
+.password
+
+# Everything you store lives in data/ (links, icons, logs) — only its README is committed
+data/*
+!data/README.md
+
+# Logs
+*.log
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

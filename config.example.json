@@ -1,0 +1,46 @@
+{
+  "_comment": "App Router settings. INSTALL_APP.sh copies this to config.json (which is never committed). Everything here is also editable in the app under Settings. Paths are relative to this file.",
+
+  "server": {
+    "_comment": "port 80 is the usual web port: no number needed in the address. allowNetwork false = only this computer can open the page; true = other devices on your network (or VPN) can too. Both need a restart. extraHosts = other names this computer is reached by that the app should answer to, e.g. a Tailscale name like mac-mini.tailnet-name.ts.net (applies at once).",
+    "port": 80,
+    "allowNetwork": false,
+    "extraHosts": []
+  },
+
+  "security": {
+    "_comment": "loginEnabled true = everyone signs in before they see the page (turn it on in Settings → Access, which also creates the first user). Passwords live in passwordFile (bcrypt hashes, owner-only). No file = you are asked to create a login. Forgot every password? Delete that file and reload. sessionHours needs a restart.",
+    "loginEnabled": false,
+    "passwordFile": "./.password",
+    "sessionHours": 12
+  },
+
+  "data": {
+    "_comment": "Where links and directories are kept, and the pictures uploaded for links. A changed path is used after a restart.",
+    "file": "./data/links.json",
+    "iconsDir": "./data/icons"
+  },
+
+  "page": {
+    "_comment": "title = the name at the top left and on the browser tab. rootName = the heading over the links that are not in a directory. allowEditing false hides Add link / New directory and refuses every change to links and directories. showSearch false hides the search box.",
+    "title": "App Router",
+    "rootName": "Apps",
+    "allowEditing": true,
+    "showSearch": true
+  },
+
+  "health": {
+    "_comment": "enabled false = nothing is checked and every light is grey. intervalSeconds = time between rounds (5-3600). timeoutSeconds = how long to wait for an answer (1-60). recoveredMinutes = how long a link stays yellow after it answers again (0-1440). failuresBeforeDown = failed checks in a row before a link turns red (1-10).",
+    "enabled": true,
+    "intervalSeconds": 30,
+    "timeoutSeconds": 5,
+    "recoveredMinutes": 10,
+    "failuresBeforeDown": 2
+  },
+
+  "appearance": {
+    "_comment": "theme is light, dark, system (follows each device) or the id of one of your customThemes (made in Settings → Appearance).",
+    "theme": "system",
+    "customThemes": []
+  }
+}

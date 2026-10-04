@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens. Components use only these (through the Tailwind names below),
+ * so Light, Dark and your own themes all restyle the whole page. A custom theme
+ * sets the same variables inline on <html> (see lib/theme.ts).
+ */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #f7f9fb;
+  --ink: #17212b;
+  --ink-2: #3a4754;
+  --mute: #5b6875;
+  --faint: #66727f;
+  --line: #dde2e8;
+  --line-2: #c5cdd6;
+  --accent: #2b59d9;
+  --accent-ink: #ffffff;
+  --accent-soft: #dce6fb;
+  --accent-softer: #eef3fd;
+  --accent-text: #1e43a8;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn: #8a5a00;
+  --warn-soft: #fff6df;
+  /* the status lights: the text colour, and the light itself */
+  --ok: #1a7f45;
+  --ok-light: #22a45a;
+  --warn-light: #e0a100;
+  --danger-light: #d43c2a;
+  --off-light: #8a95a1;
+  --shadow: 20 32 48;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  /* a dimmed dark: raised surfaces are lighter than the page, text is off-white */
+  --bg: #12171d;
+  --surface: #1a212a;
+  --surface-2: #212a35;
+  --ink: #e6ecf2;
+  --ink-2: #c5cfda;
+  --mute: #9ba9b7;
+  --faint: #8795a3;
+  --line: #2b3541;
+  --line-2: #3a4756;
+  --accent: #7fa8ff;
+  --accent-ink: #0b1a33;
+  --accent-soft: #223a66;
+  --accent-softer: #1b2c4b;
+  --accent-text: #a9c4ff;
+  --danger: #ff8a7a;
+  --danger-soft: #43282a;
+  --warn: #f2c14e;
+  --warn-soft: #3b3220;
+  --ok: #5fd39a;
+  --ok-light: #3fbf83;
+  --warn-light: #f2c14e;
+  --danger-light: #f2644f;
+  --off-light: #8a99a8;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-mute: var(--mute);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-softer: var(--accent-softer);
+  --color-accent-text: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-light: var(--ok-light);
+  --color-warn-light: var(--warn-light);
+  --color-danger-light: var(--danger-light);
+  --color-off-light: var(--off-light);
+  --font-sans: "Figtree Variable", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* Base rules live in the base layer so Tailwind utilities (text-accent-ink on a button…) always win. */
+@layer base {
+  html, body, #root { min-height: 100%; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 0; }
+  * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+  input[type="search"]::-webkit-search-cancel-button { display: none; }
+}
+
+.shadow-lift { box-shadow: 0 18px 40px rgb(var(--shadow) / 0.18); }
+.shadow-dialog { box-shadow: 0 36px 80px rgb(var(--shadow) / 0.32); }
+.shadow-soft { box-shadow: 0 1px 2px rgb(var(--shadow) / 0.06); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
