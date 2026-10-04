@@ -26,7 +26,9 @@ network access on.
 
 App Router answers only when it is opened by a name the computer really has:
 `localhost`, `127.0.0.1`, and with network access on, its hostname and addresses. Any
-other name gets "This address is not one this computer answers to."
+other name gets "This address is not one this computer answers to." (HTTP 421).
+Which names count follows how the server was started, so switching network access in
+Settings changes nothing here until the restart.
 
 Add the names you use under **Other names for this computer**, for example your
 Tailscale name. This stops a web page elsewhere from pointing a name of its own at your
@@ -69,10 +71,13 @@ You cannot remove yourself. Nobody can create a user from the sign-in screen.
 
 ### Passwords
 
-- At least 8 characters. Every password box has an eye button to show what you typed.
+- 8 to 72 characters. Every password box has an eye button to show what you typed.
+  (72 is as much as the password hashing can use; a longer one is refused, not cut.)
 - Stored as bcrypt hashes in the password file, `./.password` by default, readable only
   by you. Login names are unique whatever their capitals.
-- Signing in is limited to 10 attempts per 5 minutes.
+- Signing in is limited to 10 attempts per 5 minutes from one address. Turning the
+  login on, creating the first login and changing your own password count toward the
+  same limit.
 - A wrong name and a wrong password give the same message.
 
 ### Forgot a password
@@ -83,8 +88,13 @@ to create a login again. Links, directories and settings are untouched.
 
 ### Sessions
 
-A sign-in lasts `security.sessionHours` (12 by default). Restarting App Router signs
-everyone out. Removing a user or changing their password ends their sessions.
+A sign-in lasts `security.sessionHours` (12 by default), counted from the moment of
+signing in and enforced by the server, not only by the browser. **Sign out** ends that
+session for good, even for a copy of its cookie. Restarting App Router signs everyone
+out. Removing a user or changing their password ends their sessions.
+
+The users are the password file. Change its place in Settings and the file is moved
+there, so nobody is locked out; a place that already holds a file is refused.
 
 ## Changes to the page
 
@@ -105,6 +115,24 @@ turn it on. Use the login to keep people out.
 - A link can only open `http://` or `https://` addresses.
 - Health checks only record whether something answered. See
   [Health checks](HEALTH_CHECKS.md).
+- A links file edited by hand cannot produce a tile that runs a script: anything that
+  is not an `http` or `https` address opens nothing.
+
+## Good to know
+
+- **What is open without a sign-in.** The page's own files (its code and font, with no
+  data in them) and `/api/health`, which the scripts use and which gives the version.
+  Everything else needs a sign-in while the login is on.
+- **Health checks reach out from the server.** Anyone who can change the page can make
+  the computer App Router runs on ask for any `http` or `https` address and learn
+  whether it answered. With the login off and network access on, that is anyone on the
+  network.
+- **Cookies belong to a computer's name, not to a port.** A browser sends App Router's
+  session cookie to every app on the same computer. Your other apps ignore it, and each
+  uses a cookie name of its own, so their logins do not clash. Only run apps you trust
+  on that computer.
+- **The log is not sent anywhere** and holds no passwords. `ROUTER.sh` trims it when it
+  passes 5 MB.
 
 ## What it does not do
 

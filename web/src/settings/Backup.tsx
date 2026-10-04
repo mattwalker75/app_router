@@ -19,7 +19,8 @@ export function BackupSection({ state }: { state: AppState }) {
   const [icons, setIcons] = useState(d.iconsDir);
   const [chosen, setChosen] = useState<{ name: string; document: unknown; links: number; directories: number } | null>(null);
   const box = useRef<HTMLInputElement>(null);
-  useEffect(() => { setFile(d.file); setIcons(d.iconsDir); }, [d]);
+  useEffect(() => { setFile(d.file); }, [d.file]);
+  useEffect(() => { setIcons(d.iconsDir); }, [d.iconsDir]);
   const editing = state.config.page.allowEditing;
   const here = `${plural(page.data?.links.length ?? 0, "link", "links")} and ${plural(page.data?.directories.length ?? 0, "directory", "directories")}`;
 
@@ -47,7 +48,7 @@ export function BackupSection({ state }: { state: AppState }) {
       <h1 className="text-[27px] font-bold">Backup</h1>
       <Card title="Export" sub={`Download every link and directory as one file — a backup, or the way to move the page to another computer. The page has ${here} now.`}>
         <div><a href="/api/export/download" download className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-4 font-semibold text-ink no-underline hover:bg-surface-2"><Download size={16} />Export the page</a></div>
-        <p className="text-[13.5px] text-mute">Pictures you uploaded for links are not in the file — a link without its picture shows its letters again. Settings and users are not in it either: copy <span className="font-mono">config.json</span> for those.</p>
+        <p className="text-[13.5px] text-mute">Pictures you uploaded for links are not in the file — a link without its picture shows its letters again. Settings and users are not in it either: copy <span className="font-mono">config.json</span> and the password file (<span className="font-mono">.password</span>) for those.</p>
       </Card>
       <Card title="Import" sub="Bring in a file made with Export.">
         {!editing && <Notice>Changes to the page are turned off, so nothing can be imported. Turn them on in Settings → Page first.</Notice>}

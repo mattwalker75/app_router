@@ -65,6 +65,13 @@ describe("a link to somewhere else", () => {
     expect(linkHref(g, "ignored")).toBe("https://github.com/");
     expect(displayAddress(g, "mac-mini")).toBe("github.com");
   });
+  it("never turns anything but http or https into something clickable, even from a links file edited by hand", () => {
+    for (const url of ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "file:///etc/passwd", "ftp://files.example", "not an address", ""]) {
+      const edited = { local: false, scheme: "http" as const, port: null, path: "", url };
+      expect(linkHref(edited, "mini"), url).toBe("about:blank");
+    }
+    expect(linkHref({ local: false, scheme: "http", port: null, path: "", url: "HTTPS://Example.com/x" }, "mini")).toBe("https://example.com/x");
+  });
   it("adds the missing http:// or https://", () => {
     expect(tidyAddress("github.com")).toBe("https://github.com");
     expect(tidyAddress("192.168.1.1")).toBe("http://192.168.1.1");
@@ -89,7 +96,11 @@ describe("changing a link", () => {
     expect(svc.updateLink(l.id, { health: { enabled: false } }).health).toEqual({ enabled: false, path: "" });
     expect(svc.updateLink(l.id, { icon: { text: "JV", color: "#3F5468" } }).icon).toEqual({ text: "JV", color: "#3f5468", image: null });
     expect(fail(() => svc.updateLink(l.id, { icon: { color: "blue" } }))).toMatch(/#2b59d9/);
-    expect(fail(() => svc.updateLink(l.id, { icon: { text: "LONG" } }))).toMatch(/under 3/);
+    expect(fail(() => svc.updateLink(l.id, { icon: { text: "LONG" } }))).toMatch(/3 characters or fewer/);
+    // what a person sees as one character counts once: an emoji, a flag, an accented letter
+    expect(svc.updateLink(l.id, { icon: { text: "🎬" } }).icon.text).toBe("🎬");
+    expect(svc.updateLink(l.id, { icon: { text: "🇺🇸é1" } }).icon.text).toBe("🇺🇸é1");
+    expect(fail(() => svc.updateLink(l.id, { icon: { text: "🎬🎬🎬🎬" } }))).toMatch(/3 characters or fewer/);
   });
   it("can switch between this computer and somewhere else", () => {
     const l = svc.createLink({ name: "App", port: 3000, path: "/x" });
@@ -244,6 +255,34 @@ describe("the file on disk", () => {
   });
 });
 
+describe("a links file edited by hand", () => {
+  const write = (doc: unknown) => { fs.mkdirSync(path.dirname(svc.dataFile()), { recursive: true }); fs.writeFileSync(svc.dataFile(), JSON.stringify(doc)); return new Service(scratchConfig(dir)); };
+  it("missing fields are filled in, so the page always gets whole records", () => {
+    const s = write({ directories: [{ id: "d1", name: "Lab" }], links: [{ id: "l1", name: "Bare", port: 3030 }, { id: "l2", url: "https://example.com", directoryId: "d1" }, { id: "l3", name: "Lost", port: "abc", directoryId: "gone", icon: "x", health: null, openIn: "sideways" }] });
+    const [bare, remote, lost] = ["l1", "l2", "l3"].map((id) => s.page().links.find((l) => l.id === id)!);
+    expect(bare).toMatchObject({ name: "Bare", local: true, scheme: "http", port: 3030, path: "", url: "", description: "", directoryId: null, openIn: "new", icon: { text: "", color: "", image: null }, health: { enabled: true, path: "" } });
+    expect(remote).toMatchObject({ name: "Unnamed link", local: false, url: "https://example.com", directoryId: "d1" });
+    expect(lost).toMatchObject({ port: null, directoryId: null, openIn: "new", icon: { text: "", color: "", image: null }, health: { enabled: true, path: "" } });
+    expect(s.page().directories[0]).toMatchObject({ id: "d1", name: "Lab", parentId: null });
+    expect(typeof bare.createdAt).toBe("string");
+  });
+  it("things that are not records, and second copies of an id, are left out", () => {
+    const s = write({ directories: [null, "x", { id: "d1", name: "A" }, { id: "d1", name: "Twin" }, { name: "No id" }], links: [null, 7, { id: "l1", name: "Ok", port: 1 }, { id: "l1", name: "Twin", port: 2 }] });
+    expect(s.page().directories.map((d) => d.name)).toEqual(["A"]);
+    expect(s.page().links.map((l) => l.name)).toEqual(["Ok"]);
+  });
+  it("directories tied in a knot are untied instead of hanging the app", () => {
+    const s = write({ directories: [{ id: "a", name: "A", parentId: "b" }, { id: "b", name: "B", parentId: "c" }, { id: "c", name: "C", parentId: "a" }, { id: "self", name: "Self", parentId: "self" }], links: [{ id: "l1", name: "In", port: 1, directoryId: "c" }] });
+    const dirs = s.page().directories;
+    expect(dirs).toHaveLength(4);
+    expect(dirs.filter((d) => d.parentId === null).length).toBeGreaterThanOrEqual(2);
+    // every rule that walks up the tree finishes
+    expect(s.contents("a").links + s.contents("b").links + s.contents("c").links).toBeGreaterThanOrEqual(1);
+    expect(s.createDirectory({ name: "New", parentId: "c" }).parentId).toBe("c");
+    expect(s.moveDirectory("self", { parentId: "a" }).parentId).toBe("a");
+  });
+});
+
 describe("export and import", () => {
   const build = () => {
     const lab = svc.createDirectory({ name: "Home lab" }); const cams = svc.createDirectory({ name: "Cameras", parentId: lab.id });
@@ -280,6 +319,17 @@ describe("export and import", () => {
     expect(fail(() => svc.importDocument(null, "replace"))).toMatch(/not an App Router export/);
     const bad = { format: "app-router-links", version: 1, directories: [], links: [{ name: "Bad", local: false, url: "ftp://x" }] };
     expect(fail(() => svc.importDocument(bad, "replace"))).toMatch(/Link 1 \(“Bad”\) can't be imported: Only http/);
+    expect(names(svc.page().links)).toEqual(["Here"]);
+  });
+  it("refuses entries that are not records, two directories with one id, and nesting deeper than 8 — and changes nothing", () => {
+    svc.createLink({ name: "Here", port: 1 });
+    const base = { format: "app-router-links", version: 1 };
+    expect(fail(() => svc.importDocument({ ...base, directories: [], links: [null] }, "replace"))).toMatch(/Entry 1 under “links” in that file is not a link/);
+    expect(fail(() => svc.importDocument({ ...base, directories: [{ id: "a", name: "A" }, "x"], links: [] }, "add"))).toMatch(/Entry 2 under “directories” in that file is not a directory/);
+    expect(fail(() => svc.importDocument({ ...base, directories: [{ id: "a", name: "A" }, { id: "a", name: "B" }], links: [] }, "add"))).toMatch(/same id/);
+    const deep = Array.from({ length: 9 }, (_, i) => ({ id: `d${i}`, name: `L${i + 1}`, parentId: i ? `d${i - 1}` : null }));
+    expect(fail(() => svc.importDocument({ ...base, directories: deep, links: [] }, "replace"))).toMatch(/more than 8 deep/);
+    expect(svc.importDocument({ ...base, directories: deep.slice(0, 8), links: [] }, "add")).toEqual({ directories: 8, links: 0 });
     expect(names(svc.page().links)).toEqual(["Here"]);
   });
   it("a hand-edited loop of directories is flattened instead of hanging", () => {

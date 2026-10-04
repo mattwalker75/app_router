@@ -25,7 +25,7 @@ export class Users {
   }
 
   signIn(req: Request, cred: Credential): void {
-    req.session = { loginName: cred.loginName, credTag: cred.credTag } satisfies SessionData;
+    req.session = this.auth.session(cred) satisfies SessionData;
   }
 
   private me(req: Request): string {
@@ -94,6 +94,7 @@ export class Users {
     if (confirm !== "DISABLE") throw new UserError("Type DISABLE to confirm — every user and password is removed and the page opens without a login.");
     this.config.update({ security: { loginEnabled: false } });
     this.auth.removeFile();
+    this.auth.revoke(req);
     req.session = null;
   }
 }

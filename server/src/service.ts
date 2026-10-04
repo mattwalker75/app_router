@@ -28,6 +28,9 @@ const MAX_DEPTH = 8;
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 export const MAX_ICON_BYTES = 1024 * 1024;
 
+/** What a person sees as one character: "é", "🎬" and a flag each count once. */
+export const characters = (s: string): string[] => [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].map((x) => x.segment);
+
 const byPosition = <T extends { position: number; name: string }>(a: T, b: T) => a.position - b.position || a.name.localeCompare(b.name);
 
 function text(v: unknown, what: string, max: number, required = false): string {
@@ -83,6 +86,41 @@ export class Service {
   constructor(readonly config: Config) {
     this.store = new Store(config.resolve(config.get().data.file));
     this.icons = config.resolve(config.get().data.iconsDir);
+    this.repair();
+  }
+
+  /**
+   * A links file edited by hand can miss fields, name a directory that is not there, or tie
+   * directories in a knot. Fill in and untie — in memory; the file is rewritten at the next
+   * change — so the page always gets whole records and no lookup can run in circles.
+   */
+  private repair(): void {
+    const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const when = (v: unknown) => str(v) || now();
+    const pos = (v: unknown, i: number) => (Number.isFinite(Number(v)) ? Number(v) : i);
+    const whole = (list: unknown[]) => { const seen = new Set<string>(); return list.filter((x): x is Record<string, unknown> => {
+      const id = x && typeof x === "object" ? (x as { id?: unknown }).id : undefined;
+      if (typeof id !== "string" || !id || seen.has(id)) return false; seen.add(id); return true; }); };
+    const rawDirs = whole(this.store.directories as unknown[]);
+    const ids = new Set(rawDirs.map((d) => d.id as string));
+    const dirs: Directory[] = rawDirs.map((d, i) => ({ id: d.id as string, name: str(d.name).trim() || "Unnamed directory",
+      parentId: typeof d.parentId === "string" && ids.has(d.parentId) && d.parentId !== d.id ? d.parentId : null,
+      position: pos(d.position, i), createdAt: when(d.createdAt), updatedAt: when(d.updatedAt) }));
+    untie(dirs);
+    const links: Link[] = whole(this.store.links as unknown[]).map((l, i) => {
+      const icon = (l.icon && typeof l.icon === "object" ? l.icon : {}) as Record<string, unknown>;
+      const health = (l.health && typeof l.health === "object" ? l.health : {}) as Record<string, unknown>;
+      const port = Number(l.port);
+      return { id: l.id as string, name: str(l.name).trim() || "Unnamed link", description: str(l.description),
+        directoryId: typeof l.directoryId === "string" && ids.has(l.directoryId) ? l.directoryId : null, position: pos(l.position, i),
+        local: typeof l.local === "boolean" ? l.local : !str(l.url), scheme: l.scheme === "https" ? "https" : "http",
+        port: Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null, path: str(l.path), url: str(l.url),
+        openIn: l.openIn === "same" ? "same" : "new",
+        icon: { text: str(icon.text), color: /^#[0-9a-f]{6}$/i.test(str(icon.color)) ? str(icon.color).toLowerCase() : "", image: typeof icon.image === "string" && icon.image ? icon.image : null },
+        health: { enabled: health.enabled !== false, path: str(health.path) }, createdAt: when(l.createdAt), updatedAt: when(l.updatedAt) };
+    });
+    this.store.directories.splice(0, this.store.directories.length, ...dirs);
+    this.store.links.splice(0, this.store.links.length, ...links);
   }
 
   /** Called after every change to links or directories (the health checker listens). */
@@ -207,7 +245,8 @@ export class Service {
       const rawPort = has("port") ? input.port : base && !base.local ? base.port : null;
       port = rawPort === null || rawPort === undefined || String(rawPort).trim() === "" ? null : portNumber(rawPort, "The port");
     }
-    const iconText = input.icon && "text" in input.icon ? text(input.icon.text, "The tile letters", 3) : base?.icon.text ?? "";
+    const iconText = input.icon && "text" in input.icon ? String(input.icon.text ?? "").trim() : base?.icon.text ?? "";
+    if (characters(iconText).length > 3) throw new UserError("Keep the tile letters to 3 characters or fewer.");
     let color = input.icon && "color" in input.icon ? String(input.icon.color ?? "").trim().toLowerCase() : base?.icon.color ?? "";
     if (color && !/^#[0-9a-f]{6}$/.test(color)) throw new UserError("The tile colour must look like #2b59d9.");
     const health = {
@@ -309,7 +348,12 @@ export class Service {
     const keep = mode === "add" ? this.store.document() : EMPTY();
     const ids = new Map<string, string>();
     const idFor = (old: unknown) => { const k = String(old); if (!ids.has(k)) ids.set(k, newId()); return ids.get(k)!; };
-    const known = new Set(d.directories.map((x) => String((x as Directory)?.id)));
+    const entry = (x: unknown, what: string, i: number) => {
+      if (!x || typeof x !== "object" || Array.isArray(x)) throw new UserError(`Entry ${i + 1} under “${what}” in that file is not a ${what === "links" ? "link" : "directory"}. Nothing was imported.`);
+    };
+    d.directories.forEach((x, i) => entry(x, "directories", i)); d.links.forEach((x, i) => entry(x, "links", i));
+    const known = new Set(d.directories.map((x) => String((x as Directory).id)));
+    if (known.size !== d.directories.length) throw new UserError("Two directories in that file have the same id, so it is not clear what goes where. Nothing was imported.");
     const dirs: Directory[] = d.directories.map((x, i) => {
       const s = x as Partial<Directory>;
       return { id: idFor(s.id), name: text(s.name, `The name of directory ${i + 1}`, 80, true),
@@ -317,8 +361,8 @@ export class Service {
         position: Number.isFinite(Number(s.position)) ? Number(s.position) : i, createdAt: String(s.createdAt || now()), updatedAt: now() };
     });
     // a file edited by hand could make a directory its own ancestor: such a directory goes to the main page
-    const parent = new Map(dirs.map((x) => [x.id, x.parentId]));
-    for (const x of dirs) { const seen = new Set([x.id]); for (let p = x.parentId; p; p = parent.get(p) ?? null) { if (seen.has(p)) { x.parentId = null; parent.set(x.id, null); break; } seen.add(p); } }
+    const parent = untie(dirs);
+    for (const x of dirs) { let depth = 1; for (let p = x.parentId; p; p = parent.get(p) ?? null) depth++; if (depth > MAX_DEPTH) throw new UserError(`That file nests directories more than ${MAX_DEPTH} deep (“${x.name}”). Nothing was imported.`); }
     const links: Link[] = d.links.map((x, i) => {
       const s = x as Partial<Link>;
       let v;
@@ -340,6 +384,13 @@ export class Service {
     this.changed();
     return { directories: dirs.length, links: links.length };
   }
+}
+
+/** Directories that are their own ancestor (only possible in a file edited by hand) go to the main page. Returns id → parent. */
+function untie(dirs: Directory[]): Map<string, string | null> {
+  const parent = new Map(dirs.map((x) => [x.id, x.parentId]));
+  for (const x of dirs) { const seen = new Set([x.id]); for (let p = x.parentId; p; p = parent.get(p) ?? null) { if (seen.has(p)) { x.parentId = null; parent.set(x.id, null); break; } seen.add(p); } }
+  return parent;
 }
 
 export function describe(c: { directories: number; links: number }): string {

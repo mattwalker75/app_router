@@ -1,7 +1,8 @@
 # API
 
 Everything the page does goes through these routes. Bodies and replies are JSON unless
-noted. An error is `{ "error": "a plain sentence" }` with a fitting status.
+noted. An error is `{ "error": "a plain sentence" }` with a fitting status. A request
+that arrives under a name the computer does not answer to gets `421`.
 
 With the login on, every route except the first group needs a signed-in session cookie
 and otherwise answers `401 { error, auth }`.
@@ -15,15 +16,15 @@ Routes marked ✎ are refused with `403` while **Allow changes to the page** is 
 | --- | --- |
 | `GET /api/health` | `{ ok, app: "app-router", version }`. Used by the scripts. |
 | `GET /api/auth/me` | `{ status }`: `disabled`, `not_initialized`, `unauthenticated`, or `authenticated` with `loginName`. |
-| `POST /api/auth/login` | `{ loginName, password }` → signs in. Limited to 10 tries per 5 minutes. |
+| `POST /api/auth/login` | `{ loginName, password }` → signs in. Limited to 10 tries per 5 minutes from one address, a limit shared with `setup`, `enable` and `password`. |
 | `POST /api/auth/setup` | `{ loginName, password }` → creates the first user. Only while the login is on and there is no password file. |
-| `POST /api/auth/logout` | Signs out. |
+| `POST /api/auth/logout` | Signs out. That session's cookie stops working, copies included. |
 
 ## Login and users
 
 | Route | Does |
 | --- | --- |
-| `POST /api/auth/enable` | `{ loginName, password }` → turns the login on, creates the first user, signs in. |
+| `POST /api/auth/enable` | `{ loginName, password }` → turns the login on, creates the first user, signs in. If a password file is already there, the name and password must match a user in it instead. |
 | `POST /api/auth/disable` | `{ confirm: "DISABLE" }` → turns the login off and removes every user. |
 | `POST /api/auth/password` | `{ currentPassword, newPassword }` → change your own password. |
 | `GET /api/users` | `{ users: [{ loginName, you }] }` |
@@ -71,6 +72,6 @@ Link fields: `name`, `description`, `local`, `scheme`, `port`, `path`, `url`,
 | Route | Does |
 | --- | --- |
 | `GET /api/settings` | `{ config, restartRequired, configFile }` |
-| `PUT /api/settings` | A partial config. Only known keys are accepted. Returns `{ config, restartRequired }`. `security.loginEnabled` is refused here: use `/api/auth/enable` and `/disable`. |
+| `PUT /api/settings` | A partial config, for example `{ "page": { "rootName": "My apps" } }`. Known keys are checked and saved; unknown keys are ignored. Returns `{ config, restartRequired, restartNow }`: every key waiting for a restart, and those this save changed. `security.loginEnabled` is refused here: use `/api/auth/enable` and `/disable`. Changing `security.passwordFile` moves the file. Saving a `health` key starts a round of checks. |
 | `GET /api/export/download` | The links file, as a download. |
-| `POST /api/import` ✎ | `{ document, mode: "add" \| "replace", confirm }`. `replace` needs `confirm: "REPLACE"`. |
+| `POST /api/import` ✎ | `{ document, mode: "add" \| "replace", confirm }`. `replace` needs `confirm: "REPLACE"`. Up to 5 MB. |

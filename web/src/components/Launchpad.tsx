@@ -6,19 +6,19 @@
  * and tiles can be dragged: onto another tile to reorder, onto a directory to
  * move inside it.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { closestCenter, DndContext, PointerSensor, pointerWithin, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from "@dnd-kit/core";
+import { closestCenter, DndContext, MouseSensor, pointerWithin, TouchSensor, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, FolderInput, FolderPlus, GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { displayAddress } from "../../../shared/address";
+import { displayAddress, linkHref } from "../../../shared/address";
 import type { Directory, Link, PageData, StatusReport } from "../../../shared/types";
 import { api, errorText } from "../lib/api";
 import { plural, tally, tallyVerdict } from "../lib/format";
 import { useLocal, useNow, useRefresh, type AppState } from "../lib/hooks";
-import { buildTree, moveDirectoryLocally, moveLinkLocally, pathText, type Tree } from "../lib/tree";
+import { buildTree, moveDirectoryLocally, moveLinkLocally, pathText } from "../lib/tree";
 import { useConfirm } from "./confirm";
 import { DirectoryDialog, type DirectoryDialogState } from "./DirectoryDialogs";
 import { LinkDialog, type LinkDialogState } from "./LinkDialog";
@@ -34,14 +34,16 @@ const collision: CollisionDetection = (args) => {
   const kindOf = (id: unknown) => args.droppableContainers.find((c) => c.id === id)?.data.current?.kind as string | undefined;
   const only = (kinds: string[]) => args.droppableContainers.filter((c) => kinds.includes(c.data.current?.kind) && c.id !== args.active.id);
   if (args.active.data.current?.kind === "section") return closestCenter({ ...args, droppableContainers: only(["section"]) });
+  const mine = args.active.data.current?.kind as string; // "link" or "folder"
   const hits = pointerWithin(args);
   const tile = hits.find((h) => ["link", "folder"].includes(kindOf(h.id) || "") && h.id !== args.active.id);
   if (tile) return [tile];
   const grid = hits.find((h) => kindOf(h.id) === "grid");
   if (grid) {
-    // in the gaps of the grid the tile came from, the nearest tile decides the new place
+    // In the gaps of the grid the tile came from, the nearest tile OF ITS OWN KIND decides the new
+    // place. (A link let go in a gap next to a directory tile must not vanish into that directory.)
     const container = args.droppableContainers.find((c) => c.id === grid.id)?.data.current?.container;
-    const tiles = only(["link", "folder"]).filter((c) => c.data.current?.container === container);
+    const tiles = only([mine]).filter((c) => c.data.current?.container === container);
     if (args.active.data.current?.container === container && tiles.length) return closestCenter({ ...args, droppableContainers: tiles }).slice(0, 1);
     return [grid];
   }
@@ -72,7 +74,16 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   const [collapsed, setCollapsed] = useLocal<string[]>("collapsed", []);
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
   const [dirDialog, setDirDialog] = useState<DirectoryDialogState | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  // With a mouse a drag starts after moving 8 pixels, so a plain click still opens the link. On a
+  // touch screen it starts after holding a tile for a quarter of a second, so a swipe still scrolls.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
+  );
+
+  // an address for a directory that is gone (deleted elsewhere, or an old bookmark): back to the main page
+  const gone = !!dirId && !tree.dir(dirId);
+  useEffect(() => { if (gone) window.location.replace("#/"); }, [gone]);
 
   const lightOf = (l: Link) => status?.links[l.id]?.light;
   const verdictFor = (d: Directory) => tallyVerdict(tally(tree.linksUnder(d.id).map(lightOf)));
@@ -153,7 +164,11 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
       if (o.container === a.container) { const at = tree.dirsIn(d.parentId).findIndex((x) => x.id === o.id); if (at >= 0) void moveDir(d, d.parentId, at); }
       else if (!tree.within(d.id).has(o.id)) void moveDir(d, o.id, null);
     } else if (o.kind === "section" && o.id && o.id !== d.parentId && !tree.within(d.id).has(o.id)) void moveDir(d, o.id, null);
-    else if (o.kind === "grid" && unkey(o.container) !== d.parentId && !(unkey(o.container) && tree.within(d.id).has(unkey(o.container)!))) void moveDir(d, unkey(o.container), null);
+    else if (o.kind === "grid" || o.kind === "link") {
+      // let go over a section's free space, or over one of its links: the directory goes to where those are
+      const target = unkey(o.container);
+      if (target !== d.parentId && !(target && tree.within(d.id).has(target))) void moveDir(d, target, null);
+    }
   };
 
   // ---------------------------------------------------------------- pieces
@@ -193,7 +208,8 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   const q = query.trim().toLowerCase();
   if (q) {
     const hit = (s: string) => s.toLowerCase().includes(q);
-    const links = page.links.filter((l) => hit(l.name) || hit(l.description) || hit(displayAddress(l, computer)) || hit(pathText(tree, l.directoryId)));
+    // the address is searched in full (the tile only shows a shortened one), and as it would open from here
+    const links = page.links.filter((l) => hit(l.name) || hit(l.description) || hit(displayAddress(l, computer)) || hit(linkHref(l, hostname)) || hit(l.url) || hit(pathText(tree, l.directoryId)));
     const dirs = page.directories.filter((d) => hit(d.name));
     return wrap(
       <section className="flex flex-col gap-3.5">

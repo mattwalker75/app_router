@@ -124,6 +124,35 @@ describe("grey", () => {
   });
 });
 
+describe("one moment of trouble is one failed check", () => {
+  it("a link is never asked twice at the same time, so overlapping checks can't count double", async () => {
+    let asked = 0; let release: () => void = () => {};
+    const slow = () => new Promise<{ up: boolean; ms: null; detail: string }>((res) => { asked++; release = () => res({ up: false, ms: null, detail: "No answer" }); });
+    const l = svc.createLink({ name: "App", port: 1 });
+    const h = new HealthChecker(config, svc, { now: () => clock, probe: slow });
+    const first = h.checkAll();
+    await new Promise((r) => setTimeout(r, 20));
+    svc.updateLink(l.id, { description: "changed while the check is out" }); // would start a second check of the same link
+    h.start(); await new Promise((r) => setTimeout(r, 20)); h.stop();          // and so would the timer
+    expect(asked).toBe(1);
+    release(); await first;
+    expect(h.statusOf(svc.page().links[0]).light).toBe("pending");            // one failure, not two: not red yet
+  });
+  it("saving a health setting starts a round at once", async () => {
+    const a = await app();
+    const l = svc.createLink({ name: "App", port: a.port });
+    config.update({ health: { enabled: false } });
+    const h = checker(); h.start();
+    try {
+      await new Promise((r) => setTimeout(r, 60));
+      expect(a.hits).toHaveLength(0); expect(h.statusOf(l).light).toBe("unchecked");
+      config.update({ health: { enabled: true, intervalSeconds: 3600 } }); h.settingsChanged();
+      for (let i = 0; i < 40 && h.statusOf(l).light !== "online"; i++) await new Promise((r) => setTimeout(r, 25));
+      expect(h.statusOf(l).light).toBe("online");                             // not "Checking…" for the next hour
+    } finally { h.stop(); }
+  });
+});
+
 describe("when links change", () => {
   it("a new link is checked straight away once checking has started, and a removed one is forgotten", async () => {
     const a = await app();

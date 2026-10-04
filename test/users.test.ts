@@ -1,7 +1,7 @@
 /** The optional login and users: the same rules as my_business_manager — several logins, one shared page, everyone an admin. */
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cookieClient, startServer, type Caller, type Running } from "./helpers.js";
 
 let s: Running;
@@ -146,7 +146,60 @@ describe("users — every user may do all of this", () => {
   });
 });
 
+describe("sessions end on the server, not only in the browser", () => {
+  it("a copied cookie stops working after the sign-in length (1 hour in these tests)", async () => {
+    await loginOn();
+    const cookie = s.call.cookie();
+    const withCookie = () => fetch(s.base + "/api/page", { headers: { cookie } }).then((r) => r.status);
+    expect(await withCookie()).toBe(200);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + 59 * 60_000); expect(await withCookie()).toBe(200);
+      vi.setSystemTime(Date.now() + 2 * 60_000); expect(await withCookie()).toBe(401);
+    } finally { vi.useRealTimers(); }
+  });
+  it("signing out ends that session even for a copy of its cookie; other sessions stay", async () => {
+    await loginOn();
+    const other = visitor(); await other("POST", "/api/auth/login", { loginName: "matt", password: "matt-password" });
+    const copy = s.call.cookie();
+    await s.call("POST", "/api/auth/logout");
+    expect((await fetch(s.base + "/api/page", { headers: { cookie: copy } })).status).toBe(401);
+    expect((await other("GET", "/api/page")).status).toBe(200);
+  });
+});
+
+describe("passwords", () => {
+  it("longer than bcrypt can use (72 bytes) is refused instead of silently cut", async () => {
+    expect((await s.call("POST", "/api/auth/enable", { loginName: "matt", password: "x".repeat(73) })).json.error).toMatch(/72 characters or fewer/);
+    await loginOn(s.call, "matt", "x".repeat(72));
+    expect((await visitor()("POST", "/api/auth/login", { loginName: "matt", password: "x".repeat(72) })).status).toBe(200);
+    expect((await s.call("POST", "/api/users", { loginName: "sarah", password: "é".repeat(37) })).json.error).toMatch(/72 characters or fewer/); // 74 bytes
+  });
+});
+
 describe("the password file", () => {
+  it("changing where it is kept takes the users along — nobody is locked out, nobody can claim the login", async () => {
+    await loginOn();
+    await s.call("POST", "/api/users", { loginName: "sarah", password: "sarah-password" });
+    const r = await s.call("PUT", "/api/settings", { security: { passwordFile: "./secrets/users.json" } });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(fs.existsSync(pwFile())).toBe(false);
+    const moved = path.join(s.dir, "secrets/users.json");
+    expect(JSON.parse(fs.readFileSync(moved, "utf8")).users.map((u: any) => u.loginName)).toEqual(["matt", "sarah"]);
+    expect(fs.statSync(moved).mode & 0o777).toBe(0o600);
+    expect(await me(s.call)).toEqual({ status: "authenticated", loginName: "matt" });       // still signed in
+    expect(await me(visitor())).toEqual({ status: "unauthenticated" });                      // not "create a login"
+    expect((await visitor()("POST", "/api/auth/setup", { loginName: "intruder", password: "intruder-pw" })).status).toBe(409);
+    expect((await visitor()("POST", "/api/auth/login", { loginName: "sarah", password: "sarah-password" })).status).toBe(200);
+  });
+  it("…and is refused when a file is already at the new place", async () => {
+    await loginOn();
+    fs.writeFileSync(path.join(s.dir, "taken.json"), "{}");
+    const r = await s.call("PUT", "/api/settings", { security: { passwordFile: "./taken.json" } });
+    expect(r.status).toBe(409); expect(r.json.error).toMatch(/already a file at/);
+    expect(fs.existsSync(pwFile())).toBe(true);
+    expect((await s.call("GET", "/api/state")).json.config.security.passwordFile).toBe("./.password");
+  });
   it("deleting it asks for a new first login; links and settings are untouched", async () => {
     await loginOn();
     await s.call("POST", "/api/links", { name: "Keep me", port: 3030 });

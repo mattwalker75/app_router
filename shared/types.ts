@@ -4,7 +4,7 @@
  * A link is one tile on the page. It either points at an app on the SAME
  * computer as App Router (a port, plus an optional path — the page fills in
  * whatever name you used to reach App Router), or at a full address somewhere
- * else. Directories group links the way bookmark folders do, to any depth;
+ * else. Directories group links the way bookmark folders do, up to 8 deep;
  * a link with no directory sits on the main page.
  */
 export interface Directory {

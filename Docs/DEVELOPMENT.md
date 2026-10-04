@@ -9,7 +9,9 @@ npm test              # every suite
 npm run build         # dist/web and dist/node
 ```
 
-Never test on your real `config.json` or `data/`. Point a scratch copy somewhere else:
+Never test on your real `config.json` or `data/`. Always give the server its config
+file: started with no `AR_CONFIG`, it uses the app's own `config.json`, and with none
+there, the defaults — port 80. Point a scratch copy somewhere else:
 
 ```bash
 mkdir -p /some/scratch && echo '{ "server": { "port": 18200 } }' > /some/scratch/config.json
@@ -21,7 +23,8 @@ its links, pictures and password file to itself.
 
 ## Tests
 
-`npm test` runs Vitest. No suite needs the internet, a database or port 80.
+`npm test` runs Vitest. No suite needs the internet, a database or port 80, and none
+installs anything on the computer.
 
 | Suite | Covers |
 | --- | --- |
@@ -31,14 +34,17 @@ its links, pictures and password file to itself.
 | `users.test.ts` | The login, users, the password file, the sign-in limit |
 | `listen.test.ts` | Listening on this computer only, the low-port filter, the network |
 | `page.test.ts` | Light labels, tile colours, and that a drop on screen matches the server |
+| `scripts.test.ts` | `ROUTER.sh` and `AUTOSTART.sh` run for real in a scratch copy, with a stand-in `launchctl` and a scratch home folder. macOS only, and skipped until the app is built. |
 
 `test/helpers.ts` starts the real app on a spare port with scratch data
 (`startServer`), keeps cookies like a browser (`cookieClient`), and makes stand-in apps
 (`fakeApp`) and a port nothing listens on (`deadPort`).
 
 The page itself is checked by hand, or with a headless browser against a scratch copy.
-Two things to know when driving it: Radix menus open on `pointerdown`, not on
-`.click()`, and a drag needs real mouse events moved more than 8 pixels.
+Things to know when driving it: Radix menus open on `pointerdown`, not on `.click()`;
+a mouse drag needs real mouse events moved more than 8 pixels; a touch drag needs a
+press held for a quarter of a second first; and a link that opens in a new tab stalls
+a single-tab driver.
 
 ## Conventions
 
@@ -51,7 +57,11 @@ Two things to know when driving it: Radix menus open on `pointerdown`, not on
   the type in `web/src/lib/hooks.ts`, a row in `Docs/CONFIGURATION.md`, and
   `RESTART_REQUIRED` if it needs a restart.
 - **A route that changes links or directories takes the `editing` guard** in `app.ts`.
-- **Colours come from theme tokens only**, so every theme restyles everything.
+- **Colours come from theme tokens only**, so every theme restyles everything. Two
+  exceptions: tile colours are a fixed palette that white letters read on, and the knob
+  of a switch is white.
+- **A box in Settings follows its own saved value** (`useEffect` on that one value), so
+  saving something else never wipes what is being typed.
 - **Destructive actions need a typed word** in the page and on the server: `DELETE`,
   `REPLACE`, `DISABLE`.
 - **Buttons and fields are 44 px tall**; the page must work at phone width.

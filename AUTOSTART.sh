@@ -27,12 +27,15 @@
 # While it is installed, ./ROUTER.sh --start, --stop and --restart work through it,
 # so you keep using ROUTER.sh as before. After changing the port or network access
 # in Settings:  ./ROUTER.sh --restart
+# It always runs this copy of the app with the config.json next to this script, and
+# writes its log to ~/Library/Logs/app-router.log (./ROUTER.sh --logs follows it).
 #
 # One thing to know: macOS protects the Desktop, Documents and Downloads folders.
 # If App Router lives in one of them, macOS asks once whether "node" may use that
 # folder — answer Allow. With --system there is nobody to ask, so keep the app
 # outside those folders (for example ~/Apps/app_router) or give node Full Disk
-# Access in System Settings → Privacy & Security.
+# Access in System Settings → Privacy & Security. (The log is kept outside the
+# app's folder for the same reason.)
 #
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$HERE"
@@ -44,7 +47,10 @@ LABEL="com.app-router.server"
 AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
 DAEMON="/Library/LaunchDaemons/$LABEL.plist"
 ENTRY="$HERE/dist/node/server/src/index.js"
-LOG="$HERE/data/router.log"
+# The log goes where macOS always lets a background program write. (The app's own data/ folder
+# may sit inside Desktop or Documents, which macOS guards — and it is launchd, not node, that
+# opens the log, so nobody would be asked.)
+LOG="$HOME/Library/Logs/app-router.log"
 ME="$(id -un)"; MY_UID="$(id -u)"
 
 installed_as() { if [[ -f "$DAEMON" ]]; then echo system; elif [[ -f "$AGENT" ]]; then echo login; else echo none; fi; }
@@ -83,10 +89,11 @@ PLIST
 
 ready() {
   command -v node >/dev/null 2>&1 || { err "Node.js is not installed. Run ./INSTALL_APP.sh first."; return 1; }
+  [[ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 22 ]] || { err "Node.js $(node -v) is too old — 22 or newer is needed. Run ./INSTALL_APP.sh first."; return 1; }
   [[ -d node_modules/express ]] || { err "The app's packages are not installed. Run ./INSTALL_APP.sh first."; return 1; }
   [[ -f config.json ]] || { cp config.example.json config.json && chmod 600 config.json && info "Created config.json from config.example.json"; }
   if [[ ! -f "$ENTRY" || ! -f dist/web/index.html ]]; then info "Building App Router…"; mkdir -p data; npm run build > data/build.log 2>&1 && touch dist/.built || { err "The build failed — see data/build.log"; return 1; }; fi
-  mkdir -p data
+  mkdir -p data "$(dirname "$LOG")"; touch "$LOG"   # made by you, so it stays yours to read and trim
   case "$HERE/" in "$HOME/Desktop/"*|"$HOME/Documents/"*|"$HOME/Downloads/"*)
     warn "App Router lives in a folder macOS protects ($HERE)."
     if [[ "$1" == system ]]; then warn "Started at boot, macOS can't ask for permission — if it does not start, move the app out of Desktop/Documents/Downloads or give node Full Disk Access."
@@ -121,7 +128,7 @@ cmd_install() { # cmd_install <login|system>
   rm -f "$tmp"
   for _ in $(seq 1 60); do answering && break; sleep 0.25; done
   if answering; then ok "App Router now starts $([[ "$how" == system ]] && echo "when this Mac boots" || echo "when you log in"), and is running — $(url)"
-  else warn "Installed, but App Router is not answering yet. Look at the end of data/router.log:"; tail -n 15 "$LOG" 2>/dev/null; return 1; fi
+  else warn "Installed, but App Router is not answering yet. Look at the end of $LOG:"; tail -n 15 "$LOG" 2>/dev/null; return 1; fi
 }
 cmd_remove() { # cmd_remove <login|system|auto>
   local how="$1"; [[ "$how" == auto ]] && how="$(installed_as)"

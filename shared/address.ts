@@ -14,9 +14,19 @@ export function localHref(link: Addr, hostname: string): string {
   return `${link.scheme}://${bracket(hostname)}${link.port && link.port !== standard ? `:${link.port}` : ""}${link.path || "/"}`;
 }
 
-/** A link somewhere else: its address, with the optional port put in. */
+/**
+ * A link somewhere else: its address, with the optional port put in. Only http and https
+ * ever come out of here — the server refuses anything else when a link is saved, and this
+ * is the second lock for a links file edited by hand ("javascript:…" must never become a
+ * tile you can click).
+ */
 export function remoteHref(link: Addr): string {
-  try { const u = new URL(link.url); if (link.port) u.port = String(link.port); return u.href; } catch { return link.url; }
+  try {
+    const u = new URL(link.url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "about:blank";
+    if (link.port) u.port = String(link.port);
+    return u.href;
+  } catch { return "about:blank"; }
 }
 
 /**
@@ -37,7 +47,9 @@ export const linkHref = (link: Addr, hostname: string) => (link.local ? localHre
 export function displayAddress(link: Addr, computerName: string): string {
   if (link.local) return `Port ${link.port} on ${computerName}${link.path && link.path !== "/" ? ` · ${link.path}` : ""}`;
   try {
-    const u = new URL(remoteHref(link));
+    const href = remoteHref(link);
+    if (href === "about:blank") return link.url || "no address";
+    const u = new URL(href);
     const rest = (u.pathname === "/" ? "" : u.pathname) + u.search;
     return u.host + (rest.length > 28 ? rest.slice(0, 27) + "…" : rest);
   } catch { return link.url; }

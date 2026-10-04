@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { checkUrl, linkHref, withScheme } from "../../../shared/address";
 import type { Link } from "../../../shared/types";
 import { api, errorText } from "../lib/api";
-import { colorFor, initials, TILE_COLORS } from "../lib/format";
+import { characters, colorFor, initials, TILE_COLORS } from "../lib/format";
 import { useRefresh } from "../lib/hooks";
 import type { Tree } from "../lib/tree";
 import { TileIcon } from "./Tiles";
@@ -35,7 +35,10 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
   const [description, setDescription] = useState(l?.description ?? "");
   const [local, setLocal] = useState(l?.local ?? true);
   const [scheme, setScheme] = useState<"http" | "https">(l?.scheme ?? "http");
-  const [port, setPort] = useState(l?.port ? String(l.port) : "");
+  // two boxes, two values: the port of an app on this computer is not the optional port of an address elsewhere
+  const [localPort, setLocalPort] = useState(l?.local && l.port ? String(l.port) : "");
+  const [remotePort, setRemotePort] = useState(l && !l.local && l.port ? String(l.port) : "");
+  const port = local ? localPort : remotePort;
   const [path, setPath] = useState(l?.path ?? "");
   const [url, setUrl] = useState(l?.url ?? "");
   const [directoryId, setDirectoryId] = useState<string | null>(l ? l.directoryId : state.directoryId);
@@ -94,7 +97,7 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
           {local ? (
             <>
               <div className="flex flex-wrap gap-3">
-                <Field label="Port" htmlFor="k-port" className="w-[120px]"><TextInput id="k-port" inputMode="numeric" placeholder="3030" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
+                <Field label="Port" htmlFor="k-port" className="w-[120px]"><TextInput id="k-port" inputMode="numeric" placeholder="3030" value={localPort} onChange={(e) => setLocalPort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
                 <Field label={<>Path<Optional /></>} htmlFor="k-path" className="min-w-[160px] flex-1"><TextInput id="k-path" placeholder="/" value={path} onChange={(e) => setPath(e.target.value)} /></Field>
                 <Field label="Type" htmlFor="k-scheme" className="w-[110px]"><Select id="k-scheme" value={scheme} onChange={(e) => setScheme(e.target.value === "https" ? "https" : "http")}><option value="http">http</option><option value="https">https</option></Select></Field>
               </div>
@@ -103,7 +106,7 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
           ) : (
             <div className="flex flex-wrap gap-3">
               <Field label="Address" htmlFor="k-url" className="min-w-[220px] flex-1"><TextInput id="k-url" inputMode="url" autoCapitalize="none" placeholder="https://example.com" value={url} onChange={(e) => setUrl(e.target.value)} /></Field>
-              <Field label={<>Port<Optional /></>} htmlFor="k-rport" className="w-[120px]"><TextInput id="k-rport" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
+              <Field label={<>Port<Optional /></>} htmlFor="k-rport" className="w-[120px]"><TextInput id="k-rport" inputMode="numeric" value={remotePort} onChange={(e) => setRemotePort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
             </div>
           )}
           {opens && <p className="break-all text-[13.5px] text-ink-2">Opens <span className="font-mono text-[13px] text-ink">{opens}</span></p>}
@@ -135,7 +138,7 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
           <div className="flex flex-wrap items-center gap-4">
             {picture ? <img src={picture.preview} alt="" width={48} height={48} className="h-12 w-12 rounded-xl object-cover" />
               : l?.icon.image && !removePicture ? <TileIcon link={l} /> : <TileIcon link={previewLink} />}
-            <Field label={<>Letters<Optional /></>} htmlFor="k-text" className="w-[110px]"><TextInput id="k-text" maxLength={3} placeholder={initials(name || "New link")} value={text} disabled={hasPicture} onChange={(e) => setText(e.target.value)} /></Field>
+            <Field label={<>Letters<Optional /></>} htmlFor="k-text" className="w-[110px]"><TextInput id="k-text" placeholder={initials(name || "New link")} value={text} disabled={hasPicture} onChange={(e) => setText(characters(e.target.value).slice(0, 3).join(""))} /></Field>
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-semibold">Colour</span>
               <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Tile colour">

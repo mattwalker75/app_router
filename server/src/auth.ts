@@ -19,6 +19,7 @@
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import bcrypt from "bcryptjs";
 import type { Request } from "express";
 import type { Config } from "./config.js";
@@ -29,19 +30,43 @@ export interface SessionData {
   loginName?: string;
   /** fingerprint of the password this session signed in with */
   credTag?: string;
+  /** when the session was made (ms) — the server, not only the browser, ends it after security.sessionHours */
+  at?: number;
+  /** a random id, so signing out ends THIS session even if its cookie was copied */
+  sid?: string;
 }
 export interface Credential { loginName: string; credTag: string }
 
 /** the same minimum as my_business_manager; only checked when a password is SET, so older, shorter ones still sign in */
 export const MIN_PASSWORD = 8;
+/** bcrypt only looks at the first 72 bytes of a password; anything longer would be silently cut */
+export const MAX_PASSWORD_BYTES = 72;
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const tagOf = (passwordHash: string) => crypto.createHash("sha256").update(passwordHash).digest("hex").slice(0, 16);
 
 export class Auth {
   /** compared against when the login name is unknown (made on first need) */
   private decoy: string | null = null;
+  /** sessions that signed out: id → when the session would have ended anyway (kept until then; a restart ends every session) */
+  private signedOut = new Map<string, number>();
+  /** how long a sign-in lasts — fixed when the server starts, like the cookie's own lifetime */
+  private readonly sessionMs: number;
 
-  constructor(private readonly config: Config) {}
+  constructor(private readonly config: Config) {
+    this.sessionMs = Math.max(1, Number(config.get().security.sessionHours) || 12) * 3600_000;
+  }
+
+  /** What a new session holds. */
+  session(cred: Credential): SessionData {
+    return { loginName: cred.loginName, credTag: cred.credTag, at: Date.now(), sid: crypto.randomBytes(9).toString("base64url") };
+  }
+  /** Signing out: this session's cookie stops working, even a copy of it. */
+  revoke(req: Request): void {
+    const s = req.session as SessionData | null | undefined;
+    if (s?.sid && s.at) this.signedOut.set(s.sid, s.at + this.sessionMs);
+    const now = Date.now();
+    for (const [sid, until] of this.signedOut) if (until < now) this.signedOut.delete(sid);
+  }
 
   file(): string { return this.config.resolve(this.config.get().security.passwordFile); }
   enabled(): boolean { return !!this.config.get().security.loginEnabled; }
@@ -70,7 +95,8 @@ export class Auth {
   /** The login name of a signed-in request, or null. A removed user or a changed password ends the session. */
   current(req: Request): string | null {
     const s = req.session as SessionData | null | undefined;
-    if (!s?.loginName || !s.credTag || !this.initialized()) return null;
+    if (!s?.loginName || !s.credTag || !s.at || !s.sid || !this.initialized()) return null;
+    if (Date.now() - s.at > this.sessionMs || s.at > Date.now() + 60_000 || this.signedOut.has(s.sid)) return null;
     try { const u = this.find(s.loginName); return u && tagOf(u.passwordHash) === s.credTag ? u.loginName : null; } catch { return null; }
   }
 
@@ -95,7 +121,7 @@ export class Auth {
   }
   private static checkPassword(password: unknown): void {
     if (!password || String(password).length < MIN_PASSWORD) throw new UserError(`Choose a password of at least ${MIN_PASSWORD} characters.`);
-    if (String(password).length > 1024) throw new UserError("That password is too long.");
+    if (Buffer.byteLength(String(password), "utf8") > MAX_PASSWORD_BYTES) throw new UserError(`Keep the password to ${MAX_PASSWORD_BYTES} characters or fewer (fewer still with accents or emoji).`);
   }
   private cred(u: StoredLogin): Credential { return { loginName: u.loginName, credTag: tagOf(u.passwordHash) }; }
 
@@ -121,16 +147,20 @@ export class Auth {
   /** Add another login. Names are unique whatever their capitals. */
   async add(loginName: unknown, password: unknown): Promise<string> {
     const v = Auth.check(loginName, password);
-    const list = this.logins();
-    if (list.some((u) => same(u.loginName, v.name))) throw new UserError(`There is already a user called “${v.name}”. Pick a different login name.`, 409);
-    this.write([...list, { loginName: v.name, passwordHash: await bcrypt.hash(v.password, 10) }]);
+    const taken = () => { if (this.logins().some((u) => same(u.loginName, v.name))) throw new UserError(`There is already a user called “${v.name}”. Pick a different login name.`, 409); };
+    taken();
+    const passwordHash = await bcrypt.hash(v.password, 10);
+    // read the list again AFTER the slow hashing, so a user removed or changed meanwhile is not put back
+    taken();
+    this.write([...this.logins(), { loginName: v.name, passwordHash }]);
     return v.name;
   }
 
   /** Give `name` this password — replacing the one it has, or creating its login when it has none. */
   async setPassword(name: string, password: unknown): Promise<Credential> {
     Auth.checkPassword(password);
-    const u = { loginName: this.find(name)?.loginName ?? name, passwordHash: await bcrypt.hash(String(password), 10) };
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const u = { loginName: this.find(name)?.loginName ?? name, passwordHash };
     this.write([...this.logins().filter((x) => !same(x.loginName, name)), u]);
     return this.cred(u);
   }
@@ -150,4 +180,19 @@ export class Auth {
   }
 
   removeFile(): void { fs.rmSync(this.file(), { force: true }); }
+
+  /**
+   * The password file setting is about to change to `next` (a resolved path). The users must
+   * come along: without this the app would suddenly have no users and ask whoever loads the page
+   * first to create one. Refuses when something is already at the new place.
+   */
+  moveFile(next: string): void {
+    const from = this.file();
+    if (path.resolve(next) === path.resolve(from) || !fs.existsSync(from)) return;
+    if (fs.existsSync(next)) throw new UserError(`There is already a file at ${next}. Choose another place for the password file, or remove that file first.`, 409);
+    fs.mkdirSync(path.dirname(next), { recursive: true });
+    try { fs.renameSync(from, next); }
+    catch { fs.copyFileSync(from, next); fs.rmSync(from, { force: true }); } // another disk: copy, then remove
+    try { fs.chmodSync(next, 0o600); } catch {}
+  }
 }

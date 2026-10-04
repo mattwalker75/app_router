@@ -9,7 +9,9 @@ export function PageSection({ state }: { state: AppState }) {
   const p = state.config.page;
   const [title, setTitle] = useState(p.title);
   const [rootName, setRootName] = useState(p.rootName);
-  useEffect(() => { setTitle(p.title); setRootName(p.rootName); }, [p]);
+  // each box follows its OWN saved value: flipping a switch below must not undo what you are typing
+  useEffect(() => { setTitle(p.title); }, [p.title]);
+  useEffect(() => { setRootName(p.rootName); }, [p.rootName]);
   return (
     <>
       <h1 className="text-[27px] font-bold">Page</h1>

@@ -1,5 +1,5 @@
 /** The frame around everything: the header (name, search, status summary, Settings, who is signed in) and below it the page or Settings. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, KeyRound, LogOut, Search, SlidersHorizontal, User, X } from "lucide-react";
 import { go, useRoute } from "../App";
@@ -33,6 +33,20 @@ export function Shell({ state }: { state: AppState }) {
   useEffect(() => { if (!showSearch) setQuery(""); }, [showSearch]);
   useEffect(() => { setQuery(""); }, [route.view === "dir" ? route.id : route.view]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // "/" jumps to the search box, as it does on many sites — unless you are typing somewhere
+  const searchBox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!showSearch) return;
+    const f = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey || (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable))) return;
+      if (document.querySelector("[role=dialog]")) return;
+      e.preventDefault(); searchBox.current?.focus();
+    };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [showSearch]);
+
   const counts = tally((page.data?.links ?? []).map((l) => status.data?.links[l.id]?.light));
   const summary = tallyText(counts);
   const signOut = async () => {
@@ -53,7 +67,7 @@ export function Shell({ state }: { state: AppState }) {
         {showSearch && (
           <div className="flex h-11 min-w-[200px] max-w-[440px] flex-1 items-center gap-2 rounded-[10px] border border-line bg-surface-2 px-3 text-mute focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
             <Search size={16} aria-hidden className="shrink-0" />
-            <input type="search" aria-label="Find an app or link" placeholder="Find an app or link" value={query} onChange={(e) => setQuery(e.target.value)}
+            <input ref={searchBox} type="search" aria-label="Find an app or link" placeholder="Find an app or link" value={query} onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }}
               className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-faint" />
             {query && <button type="button" aria-label="Clear the search" onClick={() => setQuery("")} className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md hover:bg-surface hover:text-ink"><X size={15} /></button>}

@@ -48,6 +48,8 @@ describe("a tile without a picture", () => {
   it("shows two letters made from the name", () => {
     expect(initials("My Business Manager")).toBe("MB"); expect(initials("JARVIS")).toBe("JA"); expect(initials("ai_data_depot")).toBe("AD");
     expect(initials("x")).toBe("X"); expect(initials("  ")).toBe("?");
+    // an emoji is one character, never half of one
+    expect(initials("🎬 Plex")).toBe("🎬P"); expect(initials("🇺🇸")).toBe("🇺🇸"); expect(initials("Éclair")).toBe("ÉC");
   });
   it("always gets the same colour for the same name, from colours white letters read on", () => {
     expect(colorFor("People Manager")).toBe(colorFor("people manager"));

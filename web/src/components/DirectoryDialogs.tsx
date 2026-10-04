@@ -22,7 +22,8 @@ export function DirectoryDialog({ state, tree, rootName, onClose }: { state: Dir
     try {
       if (state.mode === "new") { const d = await api.post<Directory>("/api/directories", { name, parentId }); toast(`Made the directory “${d.name}”.`); }
       else if (state.mode === "rename") { await api.patch(`/api/directories/${state.dir.id}`, { name }); toast("Renamed."); }
-      else { await api.post(`/api/directories/${state.dir.id}/move`, { parentId }); toast(`Moved “${state.dir.name}”.`); }
+      else if (parentId === state.dir.parentId) { onClose(); return; } // already there: leave its place among its neighbours alone
+      else { await api.post(`/api/directories/${state.dir.id}/move`, { parentId: parentId ?? "root" }); toast(`Moved “${state.dir.name}”.`); }
       await refresh(); onClose();
     } catch (err) { setError(errorText(err)); } finally { setBusy(false); }
   };

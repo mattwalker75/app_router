@@ -35,23 +35,38 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$HERE"
 mkdir -p "$HERE/data"; PIDFILE="$HERE/data/router.pid"; LOG="$HERE/data/router.log"
+ENTRY="dist/node/server/src/index.js"
 if [[ -t 1 ]]; then C_RESET=$'\033[0m'; C_RED=$'\033[0;31m'; C_GRN=$'\033[0;32m'; C_YEL=$'\033[0;33m'; C_BLU=$'\033[0;34m'; else C_RESET=''; C_RED=''; C_GRN=''; C_YEL=''; C_BLU=''; fi
 info() { echo "${C_BLU}==>${C_RESET} $*"; }; ok() { echo "${C_GRN}OK ${C_RESET} $*"; }; warn() { echo "${C_YEL}!! ${C_RESET} $*"; }; err() { echo "${C_RED}ERROR${C_RESET} $*" >&2; }
 usage() { awk 'NR>=3 { if (/^#/) { sub(/^# ?/, ""); print } else { exit } }' "${BASH_SOURCE[0]}"; }
 
+# The config file this copy of the app uses. It is handed to the server explicitly, so the server
+# never falls back to looking for one somewhere else.
 CONFIG="${AR_CONFIG:-$HERE/config.json}"
 cfg() { node -e "try{const c=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const v=process.argv[2].split('.').reduce((a,k)=>a&&a[k],c);console.log(v===undefined?process.argv[3]:v)}catch{console.log(process.argv[3])}" "$CONFIG" "$1" "$2"; }
 port() { echo "${PORT:-$(cfg server.port 80)}"; }
 url() { local p; p="$(port)"; if [[ "$p" == 80 ]]; then echo "http://localhost"; else echo "http://localhost:$p"; fi; }
 # "is App Router answering?" — the health route says which app it is, so another web server on the port is not mistaken for it
 answering() { curl -fsS --max-time 2 "$(url)/api/health" 2>/dev/null | grep -q '"app":"app-router"'; }
-running() { [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
+# The copy started by this script: its process must be alive AND be App Router. After a restart
+# of the computer the number in the pid file can belong to some other program — never touch that.
+running() {
+  [[ -f "$PIDFILE" ]] || return 1
+  local pid; pid="$(cat "$PIDFILE" 2>/dev/null)"
+  [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -qF "$ENTRY" && return 0
+  rm -f "$PIDFILE"; return 1
+}
 node_ok() { command -v node >/dev/null 2>&1 && [[ "$(node -p 'process.versions.node.split(".")[0]')" -ge 22 ]]; }
-ENTRY="dist/node/server/src/index.js"
 # Installed with ./AUTOSTART.sh? Then the system keeps it running, and start/stop must go through it.
 AGENT_LABEL="com.app-router.server"
 agent_plist() { if [[ -f "/Library/LaunchDaemons/$AGENT_LABEL.plist" ]]; then echo "/Library/LaunchDaemons/$AGENT_LABEL.plist"; elif [[ -f "$HOME/Library/LaunchAgents/$AGENT_LABEL.plist" ]]; then echo "$HOME/Library/LaunchAgents/$AGENT_LABEL.plist"; fi; }
 autostart() { [[ -z "${AR_NO_AUTOSTART:-}" && -n "$(agent_plist)" ]]; }
+# Started by the system, the log is kept where macOS always lets a background program write.
+autostart && LOG="$HOME/Library/Logs/app-router.log"
+# Keep the log from growing without end: past 5 MB, keep its last 2000 lines.
+trim_log() { [[ -f "$LOG" && "$(wc -c < "$LOG")" -gt 5242880 ]] && { tail -n 2000 "$LOG" > "$LOG.tmp" && cat "$LOG.tmp" > "$LOG"; rm -f "$LOG.tmp"; }; return 0; }
+# Started at boot (./AUTOSTART.sh --install --system), starting and stopping it needs an administrator.
+admin_note() { [[ "$(agent_plist)" == /Library/LaunchDaemons/* ]] && info "App Router starts at boot on this Mac, so macOS may ask for your administrator password."; return 0; }
 
 # Build when there is no build yet, or when any source file is newer than the last build.
 needs_build() {
@@ -85,22 +100,30 @@ cmd_start() {
   if autostart; then
     prereqs || return 1
     if answering; then ok "Already running (kept running by the system) — $(url)"; return 0; fi
+    admin_note; trim_log
     ./AUTOSTART.sh --kick >/dev/null 2>&1
-    if wait_up; then ok "App Router is running (kept running by the system) — $(url)"; opened; else err "It did not start — the end of data/router.log:"; tail -n 20 "$LOG"; return 1; fi
+    if wait_up; then ok "App Router is running (kept running by the system) — $(url)"; opened; else err "It did not start — the end of $LOG:"; tail -n 20 "$LOG"; return 1; fi
     return 0
   fi
   if running; then ok "Already running (pid $(cat "$PIDFILE")) — $(url)"; return 0; fi
   prereqs || return 1
   if answering; then ok "App Router is already answering at $(url) (started some other way)."; return 0; fi
-  nohup node "$ENTRY" >> "$LOG" 2>&1 & echo $! > "$PIDFILE"
+  trim_log
+  AR_CONFIG="$CONFIG" nohup node "$ENTRY" >> "$LOG" 2>&1 & echo $! > "$PIDFILE"
   for _ in $(seq 1 60); do answering && break; kill -0 "$(cat "$PIDFILE")" 2>/dev/null || break; sleep 0.25; done
   if answering; then
     ok "App Router is running — $(url)   (log: data/router.log)"
     opened
-  else err "It did not start — the end of data/router.log:"; tail -n 20 "$LOG"; rm -f "$PIDFILE"; return 1; fi
+  else
+    err "It did not start — the end of data/router.log:"; tail -n 20 "$LOG"
+    # never leave a half-started copy behind (it may be alive but not answering here)
+    kill "$(cat "$PIDFILE")" 2>/dev/null; rm -f "$PIDFILE"; return 1
+  fi
 }
 cmd_stop() {
   if autostart; then
+    answering || { info "Not running. (It starts again when the computer does; ./AUTOSTART.sh --remove ends that.)"; return 0; }
+    admin_note
     ./AUTOSTART.sh --halt >/dev/null 2>&1
     for _ in $(seq 1 20); do answering || break; sleep 0.25; done
     answering && { err "It is still answering — see ./AUTOSTART.sh --status"; return 1; }
@@ -121,18 +144,24 @@ cmd_status() {
   else info "Not running."; fi
 }
 cmd_logs() { touch "$LOG"; tail -n 60 -f "$LOG"; }
+# --fg and --dev start a server of their own, so nothing else may hold the port
+busy() {
+  if running; then err "Already running in the background (pid $(cat "$PIDFILE")); stop it first: ./ROUTER.sh -x"; return 0; fi
+  if autostart && answering; then err "App Router is running, kept running by the system; stop it first: ./ROUTER.sh -x"; return 0; fi
+  return 1
+}
 cmd_fg() {
-  running && { err "Already running in the background (pid $(cat "$PIDFILE")); stop it first: ./ROUTER.sh -x"; return 1; }
+  busy && return 1
   prereqs || return 1
-  exec node "$ENTRY"
+  AR_CONFIG="$CONFIG" exec node "$ENTRY"
 }
 cmd_test() { npx vitest run; }
 cmd_dev() {
-  running && { err "Stop the background server first: ./ROUTER.sh -x"; return 1; }
+  busy && return 1
   node_ok && [[ -d node_modules/vite ]] || { err "Run ./INSTALL_APP.sh first."; return 1; }
   [[ -f "$CONFIG" ]] || { cp config.example.json "$CONFIG" && chmod 600 "$CONFIG"; }
   info "Developer mode — open http://localhost:5174 (the page reloads as you edit; Ctrl-C stops both)"
-  exec npm run dev
+  AR_CONFIG="$CONFIG" exec npm run dev
 }
 
 [[ $# -eq 0 ]] && set -- --start

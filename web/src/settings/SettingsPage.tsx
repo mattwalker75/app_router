@@ -42,9 +42,10 @@ export function useSaveSettings() {
   const qc = useQueryClient();
   return async (patch: unknown, done = "Saved.") => {
     try {
-      const r = await api.put<{ restartRequired: string[] }>("/api/settings", patch);
+      const r = await api.put<{ restartRequired: string[]; restartNow: string[] }>("/api/settings", patch);
       await qc.invalidateQueries();
-      toast(r.restartRequired.length ? `${done} Restart App Router to apply it (./ROUTER.sh --restart).` : done);
+      // only when THIS save changed something that waits for a restart (the banner above covers the rest)
+      toast(r.restartNow.length ? `${done} Restart App Router to apply it (./ROUTER.sh --restart).` : done);
       return true;
     } catch (e) { toast.error(errorText(e)); return false; }
   };

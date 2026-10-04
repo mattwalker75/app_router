@@ -48,7 +48,16 @@ a plain sentence.
    dnd-kit only stops it spreading, and the browser would still open the link.
 10. **Docs**: detail goes in `Docs/`; `README.md` stays high-level and links there (Matt's rule).
 11. **Testing**: `npm test`. Test by hand on a scratch config (`AR_CONFIG=…`, another port),
-    never on Matt's `config.json` / `data/`. Headless-Chrome checks: Radix menus open on
+    never on Matt's `config.json` / `data/`. **Never start the server without `AR_CONFIG`**: it
+    falls back to the repo's own config.json, and with none there to the defaults — port 80
+    (a test once left a server on port 80 this way; `ROUTER.sh` now passes `AR_CONFIG` itself).
+    `test/scripts.test.ts` runs the scripts against a stand-in `launchctl` and a scratch HOME. Headless-Chrome checks: Radix menus open on
     pointerdown; a drag needs real mouse events; a link opened in a new tab stalls the driver.
-12. **Commits**: one per feature with a dated CHANGELOG entry; explicit `git add <paths>`;
+12. **Things a review found that must stay fixed**: sessions end on the server (`at` + `sid` in
+    the cookie; sign-out revokes); changing `security.passwordFile` MOVES the file; the Host
+    check uses `allowNetwork` as it was at start; `res.sendFile` is always called with `root`
+    (a dot-folder in the path otherwise breaks it); `Service.repair()` makes hand-edited data
+    whole on load; a Settings box resets only when ITS saved value changes; a link is never
+    health-checked twice at once; `ROUTER.sh` trusts a pid only if that process is App Router.
+13. **Commits**: one per feature with a dated CHANGELOG entry; explicit `git add <paths>`;
     never push — Matt pushes.

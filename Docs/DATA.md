@@ -8,11 +8,12 @@
 | Users and password hashes | `.password` | no |
 | Links and directories | `data/links.json` | no |
 | Pictures uploaded for links | `data/icons/` | no |
-| Logs | `data/router.log`, `data/build.log`, `data/test.log` | no |
+| Logs | `data/router.log`, `data/build.log`, `data/test.log`. With automatic start: `~/Library/Logs/app-router.log` | no |
 
 The paths of the links file, the pictures folder and the password file are settings.
 
 **To back everything up, copy `config.json`, `.password` and the `data/` folder.**
+`.password` only exists while the login is on.
 
 ## The links file
 
@@ -51,8 +52,14 @@ file first, so a crash cannot leave half a file.
 | `health.enabled`, `health.path` | Whether the link is checked, and an optional address to check. |
 | `createdAt`, `updatedAt` | When it was made and last changed. The app adds these. |
 
-You can edit the file by hand while App Router is stopped. If it is not valid, App
-Router says so and does not start, so nothing is overwritten.
+You can edit the file by hand while App Router is stopped. If it is not valid JSON, or
+is not a links file at all, App Router says so and does not start, so nothing is
+overwritten.
+
+Smaller slips are repaired when it starts: a missing field gets its default, a link
+that names a directory that is not there goes to the main page, a second entry with the
+same `id` or one with no `id` is left out, and directories that contain each other are
+untied. The repaired version is written back at the next change you make on the page.
 
 Directories nest up to 8 deep.
 
@@ -77,8 +84,9 @@ link, deletes the file.
 Pictures are not in an export. An imported link shows its letters until you give it a
 picture again. Settings and users are not in it either.
 
-A file that is not an export, or that holds a link that cannot be opened, is refused
-and nothing changes.
+A file is refused, and nothing changes, when it is not an export, holds a link that
+cannot be opened or an entry that is not a link or directory, has two directories with
+the same `id`, or nests directories more than 8 deep. An import file can be up to 5 MB.
 
 Import needs **Allow changes to the page** to be on.
 

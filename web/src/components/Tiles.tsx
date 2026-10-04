@@ -56,7 +56,8 @@ function Sortable({ id, data, disabled, children }: { id: string; data: Record<s
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({ id, data, disabled });
   return (
     <div ref={setNodeRef} {...(disabled ? {} : listeners)} className={cx("group relative min-w-0", isDragging && "z-10 opacity-60")}
-      style={{ transform: CSS.Translate.toString(transform), transition, touchAction: disabled ? undefined : "manipulation" }}>
+      // a long press starts a drag on a touch screen: keep the browser's own long-press menu for links out of the way
+      style={{ transform: CSS.Translate.toString(transform), transition, ...(disabled ? {} : { touchAction: "manipulation", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }) }}>
       {children}
     </div>
   );
@@ -64,7 +65,7 @@ function Sortable({ id, data, disabled, children }: { id: string; data: Record<s
 
 function TileMenu({ label, items }: { label: string; items: (MenuItem | "sep")[] }) {
   return (
-    <div className="absolute right-1.5 top-1.5" onPointerDown={(e) => e.stopPropagation()}>
+    <div className="absolute right-1.5 top-1.5" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
       <Menu items={items} trigger={
         <button type="button" aria-label={label} title={label}
           className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-faint opacity-70 transition hover:bg-surface-2 hover:text-ink hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100">

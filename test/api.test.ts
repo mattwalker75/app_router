@@ -60,6 +60,17 @@ describe("pictures", () => {
   });
 });
 
+describe("folders whose name starts with a dot", () => {
+  it("pictures kept under one are still served", async () => {
+    await s.close();
+    s = await startServer({ data: { iconsDir: "./.hidden/icons" } });
+    const l = (await s.call("POST", "/api/links", { name: "App", port: 1 })).json;
+    const name = (await s.call("POST", `/api/links/${l.id}/icon`, tinyPng(), { "content-type": "image/png" })).json.icon.image;
+    expect(fs.existsSync(path.join(s.dir, ".hidden/icons", name))).toBe(true);
+    expect((await fetch(`${s.base}/icons/${name}`)).status).toBe(200);
+  });
+});
+
 describe("Settings → Page → Allow changes", () => {
   it("off: nothing about links or directories can be changed, but the page still works", async () => {
     const dir = (await s.call("POST", "/api/directories", { name: "Dir" })).json;
@@ -113,6 +124,34 @@ describe("settings", () => {
     const r = await s.call("PUT", "/api/settings", { appearance: { theme: "custom-harbor-1", customThemes: [theme] } });
     expect(r.json.config.appearance).toEqual({ theme: "custom-harbor-1", customThemes: [{ id: "custom-harbor-1", name: "Harbor", dark: true, tokens: { bg: "#101820", accent: "#ffaa00" } }] });
     expect((await s.call("PUT", "/api/settings", { appearance: { theme: "dark" } })).json.config.appearance.theme).toBe("dark");
+  });
+  it("a group that is not a group is a plain mistake, not a crash", async () => {
+    for (const body of [{ server: "x" }, { page: null }, { health: [1] }, { appearance: 5 }]) {
+      const r = await s.call("PUT", "/api/settings", body);
+      expect(r.status, JSON.stringify(body)).toBe(400); expect(r.json.error).toMatch(/must be a group of settings/);
+    }
+    expect((await s.call("PUT", "/api/settings", [])).status).toBe(200); // nothing in it: nothing to change
+  });
+  it("the restart message is about what THIS save changed", async () => {
+    const hours = await s.call("PUT", "/api/settings", { security: { sessionHours: 5 } });
+    expect(hours.json.restartNow).toEqual(["security.sessionHours"]); expect(hours.json.restartRequired).toEqual(["security.sessionHours"]);
+    const theme = await s.call("PUT", "/api/settings", { appearance: { theme: "dark" } });
+    expect(theme.json.restartNow).toEqual([]); expect(theme.json.restartRequired).toEqual(["security.sessionHours"]); // the banner stays, the message does not repeat
+    const back = await s.call("PUT", "/api/settings", { security: { sessionHours: 1 } });
+    expect(back.json.restartNow).toEqual([]); expect(back.json.restartRequired).toEqual([]);                          // back to what it started with
+  });
+  it("something typed into config.json by hand while the app runs is kept by the next save", async () => {
+    const file = path.join(s.dir, "config.json");
+    const c = JSON.parse(fs.readFileSync(file, "utf8"));
+    c.server.extraHosts = ["mini.tail1234.ts.net"]; c._comment = "my own note";
+    fs.writeFileSync(file, JSON.stringify(c));
+    await s.call("PUT", "/api/settings", { appearance: { theme: "dark" } });
+    const after = JSON.parse(fs.readFileSync(file, "utf8"));
+    expect(after.server.extraHosts).toEqual(["mini.tail1234.ts.net"]); expect(after._comment).toBe("my own note"); expect(after.appearance.theme).toBe("dark");
+    fs.writeFileSync(file, "{ broken by hand");
+    const r = await s.call("PUT", "/api/settings", { appearance: { theme: "light" } });
+    expect(r.status).toBe(409); expect(r.json.error).toMatch(/Nothing was saved: config.json is not valid JSON/);
+    expect(fs.readFileSync(file, "utf8")).toBe("{ broken by hand");            // not written over
   });
   it("unknown keys are ignored, not written", async () => {
     await s.call("PUT", "/api/settings", { page: { title: "T", evil: 1 }, nonsense: { a: 1 } });

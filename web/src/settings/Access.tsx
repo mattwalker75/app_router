@@ -22,7 +22,13 @@ export function AccessSection({ state }: { state: AppState }) {
   const [file, setFile] = useState(c.security.passwordFile);
   const [hours, setHours] = useState(String(c.security.sessionHours));
   const [turningOn, setTurningOn] = useState(false);
-  useEffect(() => { setPort(String(c.server.port)); setNetwork(c.server.allowNetwork); setExtra((c.server.extraHosts || []).join(", ")); setFile(c.security.passwordFile); setHours(String(c.security.sessionHours)); }, [c]);
+  // each box follows its OWN saved value: saving one card must not undo what you are typing in the other
+  const savedHosts = (c.server.extraHosts || []).join(", ");
+  useEffect(() => { setPort(String(c.server.port)); }, [c.server.port]);
+  useEffect(() => { setNetwork(c.server.allowNetwork); }, [c.server.allowNetwork]);
+  useEffect(() => { setExtra(savedHosts); }, [savedHosts]);
+  useEffect(() => { setFile(c.security.passwordFile); }, [c.security.passwordFile]);
+  useEffect(() => { setHours(String(c.security.sessionHours)); }, [c.security.sessionHours]);
   const lowPort = Number(port) > 0 && Number(port) < 1024;
   const turnOff = async () => {
     if (!(await confirm({ title: "Turn the login off?", confirmLabel: "Turn the login off", danger: true, typeToConfirm: "DISABLE", message: (
@@ -70,7 +76,7 @@ export function AccessSection({ state }: { state: AppState }) {
           {on ? <Button variant="danger-outline" onClick={turnOff}>Turn the login off…</Button> : <Button variant="primary" onClick={() => setTurningOn(true)}>Turn the login on…</Button>}
         </div>
         <div className="grid items-start gap-4 sm:grid-cols-[1fr_270px]">
-          <Field label="Password file" htmlFor="a-file" badge={<ApplyBadge />} hint={<>Now: <span className="break-all font-mono text-[12.5px]">{state.passwordFile}</span></>}>
+          <Field label="Password file" htmlFor="a-file" badge={<ApplyBadge />} hint={<>Now: <span className="break-all font-mono text-[12.5px]">{state.passwordFile}</span>. Change the path and the file, with its users, is moved there.</>}>
             <TextInput id="a-file" className="font-mono !text-[14px]" value={file} onChange={(e) => setFile(e.target.value)} />
           </Field>
           <Field label="Stay signed in for (hours)" htmlFor="a-hours" badge={<ApplyBadge restart />} hint="1 to 720.">

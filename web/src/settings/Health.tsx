@@ -22,7 +22,11 @@ export function HealthSection({ state }: { state: AppState }) {
   const [recovered, setRecovered] = useState(String(h.recoveredMinutes));
   const [failures, setFailures] = useState(String(h.failuresBeforeDown));
   const [checking, setChecking] = useState(false);
-  useEffect(() => { setIntervalS(String(h.intervalSeconds)); setTimeoutS(String(h.timeoutSeconds)); setRecovered(String(h.recoveredMinutes)); setFailures(String(h.failuresBeforeDown)); }, [h]);
+  // each box follows its OWN saved value: flipping the switch above must not undo what you are typing
+  useEffect(() => { setIntervalS(String(h.intervalSeconds)); }, [h.intervalSeconds]);
+  useEffect(() => { setTimeoutS(String(h.timeoutSeconds)); }, [h.timeoutSeconds]);
+  useEffect(() => { setRecovered(String(h.recoveredMinutes)); }, [h.recoveredMinutes]);
+  useEffect(() => { setFailures(String(h.failuresBeforeDown)); }, [h.failuresBeforeDown]);
   const checkNow = async () => {
     setChecking(true);
     try {
@@ -53,7 +57,7 @@ export function HealthSection({ state }: { state: AppState }) {
           {h.enabled && status.data && <span className="text-[13.5px] text-mute">{tallyText(counts) || "No link has health checks on yet"}{counts.unchecked ? ` · ${counts.unchecked} not checked` : ""}</span>}
         </div>
       </Card>
-      <Card title="Timing" sub="These apply from the next round of checks.">
+      <Card title="Timing" sub="Saving starts a round of checks at once, with the new timing.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Check every (seconds)" htmlFor="h-int" badge={<ApplyBadge />} hint="5 to 3600. 30 is a good default."><TextInput id="h-int" inputMode="numeric" value={interval} onChange={(e) => setIntervalS(digits(e.target.value))} /></Field>
           <Field label="Wait for an answer (seconds)" htmlFor="h-to" badge={<ApplyBadge />} hint="1 to 60. No answer in this time counts as a failed check."><TextInput id="h-to" inputMode="numeric" value={timeout} onChange={(e) => setTimeoutS(digits(e.target.value))} /></Field>

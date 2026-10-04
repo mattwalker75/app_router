@@ -71,6 +71,9 @@ function findRoot(): string {
 }
 export const ROOT = findRoot();
 
+/** config.json could not be read when a setting was being saved — nothing was changed. */
+export class ConfigError extends Error {}
+
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -124,15 +127,25 @@ export class Config {
     try { fs.chmodSync(this.file, 0o600); } catch {}
   }
 
-  /** Merge a partial change in and save. Returns which of the changed keys need a restart. */
-  update(patch: unknown): { restartRequired: string[] } {
+  /**
+   * Merge a partial change in and save. The file is read again first, so something you typed
+   * into config.json by hand while the app was running is kept, not written over.
+   * restartRequired = every key waiting for a restart; restartNow = those among them that
+   * THIS change touched (what the "restart to apply" message is about).
+   */
+  update(patch: unknown): { restartRequired: string[]; restartNow: string[] } {
+    const before = this.data;
+    try { this.load(); } catch (e) { this.data = before; throw new ConfigError((e as Error).message); }
+    const was = structuredClone(this.data);
     this.data = deepMerge(this.data, structuredClone(patch));
     this.save();
+    const restartNow: string[] = [];
     for (const k of RESTART_REQUIRED) {
-      if (JSON.stringify(getPath(this.data, k)) !== JSON.stringify(getPath(this.startedWith, k))) this.pending.add(k);
-      else this.pending.delete(k);
+      const now = JSON.stringify(getPath(this.data, k));
+      if (now !== JSON.stringify(getPath(this.startedWith, k))) this.pending.add(k); else this.pending.delete(k);
+      if (now !== JSON.stringify(getPath(was, k)) && this.pending.has(k)) restartNow.push(k);
     }
-    return { restartRequired: [...this.pending] };
+    return { restartRequired: [...this.pending], restartNow };
   }
 
   restartRequired(): string[] { return [...this.pending]; }

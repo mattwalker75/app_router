@@ -57,7 +57,8 @@ still counts as up.
 | Stay yellow after coming back (minutes) | 10 | 0 to 1440. 0 means straight back to green. |
 | Failed checks in a row before red | 2 | 1 to 10 |
 
-All of them apply from the next round. **Check now** runs a round at once.
+Saving any of them, or turning the switch back on, starts a round at once with the new
+timing. **Check now** also runs a round at once.
 
 Each link also has its own switch in its form, so a link can opt out. Turn it off for
 sites you do not run: there is little point asking GitHub every 30 seconds.
@@ -70,4 +71,10 @@ sites you do not run: there is little point asking GitHub every 30 seconds.
 - The page asks for the lights again every few seconds, so it follows the checks
   without a reload.
 - The header shows a summary such as `8 online · 1 just back · 1 down`. A directory
-  shows the same for everything inside it.
+  shows one verdict for everything inside it: `2 down`, `1 just back`, or `All online`.
+- A link is never asked twice at the same moment, so one hiccup counts as one failed
+  check.
+- Anyone who can change the page can make the computer App Router runs on ask for any
+  `http` or `https` address, through a link or its **Address to check**. Only "answered
+  or not, and how fast" comes back. Keep that in mind before opening the page to people
+  you would not let do that; see [Security](SECURITY.md).

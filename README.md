@@ -4,7 +4,7 @@ One front page for every web app you run. Each app keeps its own port; App Route
 gives you a single address with a tile for each one. Click a tile and you are in the app.
 
 - **Tiles and directories.** A link is a tile with a name, an optional description and
-  picture. Directories group tiles the way bookmark folders do, to any depth.
+  picture. Directories group tiles the way bookmark folders do, up to 8 deep.
 - **Apps on this computer need only a port.** The tile opens that port on whatever name
   you used to reach App Router: `localhost`, the network address, or a Tailscale name.
   Anything elsewhere takes a full address.

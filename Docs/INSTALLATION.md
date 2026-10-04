@@ -54,7 +54,8 @@ port 80, App Router says so and does not start.
 administrator password once and starts App Router at boot; it still runs as you.
 
 macOS starts App Router again if it ever stops. `./ROUTER.sh --start`, `--stop` and
-`--restart` keep working and go through the installed service.
+`--restart` keep working and go through the installed service. Its log is then kept in
+`~/Library/Logs/app-router.log`; `./ROUTER.sh --logs` follows it.
 
 > **Protected folders.** macOS guards Desktop, Documents and Downloads. If App Router
 > lives in one of them, macOS asks once whether "node" may use that folder: answer
@@ -76,8 +77,9 @@ App Router.
 
 ## Move it to another computer
 
-Copy `config.json` and the `data/` folder to the new copy of the app, or use
-**Settings → Backup → Export** and **Import**. Details in [Data](DATA.md).
+Copy `config.json`, `.password` (the users, if the login is on) and the `data/` folder
+to the new copy of the app. Or use **Settings → Backup → Export** and **Import**, which
+moves the links and directories only. Details in [Data](DATA.md).
 
 ## Update
 

@@ -85,6 +85,8 @@ export class HealthChecker {
   private tracked = new Map<string, Tracked>();
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> | null = null;
+  /** links being asked right now — a link is never asked twice at once, so one moment of trouble counts as one failed check */
+  private inFlight = new Set<string>();
   private lastRun: number | null = null;
   private stopped = true;
 
@@ -108,6 +110,8 @@ export class HealthChecker {
     this.schedule(0);
   }
   stop(): void { this.stopped = true; if (this.timer) clearTimeout(this.timer); this.timer = null; }
+  /** A health setting was saved: run a round now (so a switched-on page is not "Checking…" for a whole interval) and time the next one by the new interval. */
+  settingsChanged(): void { if (!this.stopped) this.schedule(0); }
   private schedule(ms: number): void {
     if (this.stopped) return;
     if (this.timer) clearTimeout(this.timer);
@@ -141,6 +145,12 @@ export class HealthChecker {
   }
 
   private async checkOne(link: Link): Promise<void> {
+    if (this.inFlight.has(link.id)) return;
+    this.inFlight.add(link.id);
+    try { await this.ask(link); } finally { this.inFlight.delete(link.id); }
+  }
+
+  private async ask(link: Link): Promise<void> {
     const s = this.settings();
     const url = checkUrl(link);
     let t = this.tracked.get(link.id);

@@ -33,10 +33,10 @@ shared/
 web/src/
   App.tsx       theme, sign-in screens or the page; hash routes (#/, #/d/<id>, #/settings/<section>)
   components/   Shell (header), Launchpad (the page + drag and drop), Tiles, LinkDialog,
-                DirectoryDialogs, AuthScreens, ui, confirm
+                DirectoryDialogs, AuthScreens, ErrorBoundary, ui, confirm
   settings/     SettingsPage and its sections: Page, Appearance, Health, Access, Users, Backup
   lib/          api client, query hooks, tree, format, theme
-test/           service, health, api, users, listen and page suites + helpers
+test/           service, health, api, users, listen, page and scripts suites + helpers
 ```
 
 ## Request flow
@@ -59,7 +59,10 @@ one saved link works from `localhost`, the network address and a VPN name. Nothi
 forwarded through App Router, so the apps are untouched and keep their own logins.
 
 **One place for rules.** `service.ts` checks and tidies everything about links and
-directories. `store.ts` only reads and writes. `app.ts` only routes, and holds the one
+directories, including a links file edited by hand: when it starts it fills in missing
+fields and unties directories that contain each other, so the page always gets whole
+records. Should the page still fail to draw, an error boundary offers a reload instead
+of a blank page. `store.ts` only reads and writes. `app.ts` only routes, and holds the one
 check for "are changes allowed" in front of every route that changes links or
 directories.
 
@@ -72,7 +75,7 @@ put; `test/page.test.ts` checks both agree.
 **Health checks.** `HealthChecker` keeps one small record per link in memory: the
 verdict, when it last changed, when it last recovered, and how many checks failed in a
 row. A timer runs a round, eight links at a time. `statusOf` turns a record into a
-light. Changing a link's address starts its record again. The service tells the checker
+light. A link is never asked twice at once, and saving a health setting starts a round. Changing a link's address starts its record again. The service tells the checker
 when links change, so a new link is checked at once.
 
 **Listening.** `security.listen` binds `0.0.0.0` when network access is on, and
@@ -86,11 +89,15 @@ Turning the login on or off is not a setting but an action, so the first user is
 created in the same step.
 
 **Login.** Users are the entries of the password file. A session cookie carries the
-login name and a fingerprint of the password hash; `Auth.current` compares it on every
-request, so removing a user or changing a password ends their sessions. The cookie is
-signed with a key made at start, so a restart signs everyone out.
+login name, a fingerprint of the password hash, when it was made and a random id.
+`Auth.current` checks all of it on every request: removing a user or changing a
+password ends their sessions, a session older than `sessionHours` is refused, and
+signing out puts its id on a list of ended sessions kept until it would have expired.
+The cookie is signed with a key made at start, so a restart signs everyone out.
 
-**Drag and drop.** One `DndContext` wraps the page. Link tiles, directory tiles,
+**Drag and drop.** One `DndContext` wraps the page, with a mouse sensor (a drag starts
+after 8 pixels) and a touch sensor (after a 250 ms press, so a swipe still scrolls).
+Link tiles, directory tiles,
 top-level sections and each grid are droppable; a custom collision rule makes a tile
 under the pointer win over the grid, and the grid over its section. The click the
 browser sends after a drop is cancelled on the document, because the drag library only

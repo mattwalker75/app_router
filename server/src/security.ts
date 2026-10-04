@@ -34,10 +34,13 @@ function localNames(allowNetwork: boolean): Set<string> {
 const hostOnly = (h: string) => (h.startsWith("[") ? h.slice(0, h.indexOf("]") + 1) : h.split(":")[0]).toLowerCase();
 
 export function hostGuard(config: Config) {
+  // Network access as it was when the server STARTED: the setting only takes effect after a
+  // restart, and the names answered to must match how the server is actually listening.
+  const allowNetwork = config.get().server.allowNetwork;
   // the interface list can change (Wi-Fi reconnects) — refresh it now and then
-  let names = localNames(config.get().server.allowNetwork); let at = Date.now();
+  let names = localNames(allowNetwork); let at = Date.now();
   return (req: Request, res: Response, next: NextFunction) => {
-    if (Date.now() - at > 30_000) { names = localNames(config.get().server.allowNetwork); at = Date.now(); }
+    if (Date.now() - at > 30_000) { names = localNames(allowNetwork); at = Date.now(); }
     const host = hostOnly(String(req.headers.host || ""));
     // extra names (Settings → Access) apply at once and whether or not network access is on:
     // a VPN that forwards to this computer arrives on localhost but carries the VPN's name

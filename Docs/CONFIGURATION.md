@@ -1,14 +1,20 @@
 # Configuration
 
 Every setting lives in `config.json`, next to the scripts. **Settings** in the app
-reads and writes the same file, so editing it by hand and editing it in the app are the
-same thing.
+reads and writes the same file, so editing it by hand and editing it in the app change
+the same thing.
+
+The file is read when App Router starts. An edit made by hand while it is running takes
+effect at the next restart; a Save in Settings meanwhile keeps your edit, it does not
+write over it. If the file is not valid JSON when you save in Settings, nothing is
+saved and you are told why.
 
 - `INSTALL_APP.sh` creates it from `config.example.json`. It is never committed.
 - Missing keys use the defaults below. Unknown keys, including `_comment` notes, are kept.
 - Paths are relative to the folder `config.json` is in. `~` means your home folder.
 - The file is written with owner-only permissions.
-- To use a different file, set `AR_CONFIG=/path/to/config.json`.
+- To use a different file for a run by hand, set `AR_CONFIG=/path/to/config.json`.
+  Automatic start (`AUTOSTART.sh`) always uses the `config.json` next to the scripts.
 
 ## Keys
 
@@ -25,8 +31,8 @@ same thing.
 | Key | Default | Applies | Meaning |
 | --- | --- | --- | --- |
 | `loginEnabled` | `false` | immediately | Whether everyone signs in first. Changed with **Turn the login on / off** in Settings → Access, not with Save. |
-| `passwordFile` | `./.password` | immediately | Where the users and their password hashes are kept. |
-| `sessionHours` | `12` | after a restart | How long a sign-in lasts. 1 to 720. |
+| `passwordFile` | `./.password` | immediately | Where the users and their password hashes are kept. Changed in Settings, the file is moved to the new place, so the users stay. Changed by hand, move the file yourself. |
+| `sessionHours` | `12` | after a restart | How long a sign-in lasts, counted from signing in. 1 to 720. |
 
 ### `data`
 
@@ -51,10 +57,12 @@ Changing a path does not move the files. Move them yourself.
 | Key | Default | Applies | Meaning |
 | --- | --- | --- | --- |
 | `enabled` | `true` | immediately | The master switch. `false`: nothing is checked, every light is grey. |
-| `intervalSeconds` | `30` | next round | Time between rounds of checks. 5 to 3600. |
-| `timeoutSeconds` | `5` | next round | How long to wait for an answer. 1 to 60. |
+| `intervalSeconds` | `30` | immediately | Time between rounds of checks. 5 to 3600. |
+| `timeoutSeconds` | `5` | immediately | How long to wait for an answer. 1 to 60. |
 | `recoveredMinutes` | `10` | immediately | How long a link stays yellow after it answers again. 0 to 1440. |
-| `failuresBeforeDown` | `2` | next round | Failed checks in a row before a link turns red. 1 to 10. |
+| `failuresBeforeDown` | `2` | immediately | Failed checks in a row before a link turns red. 1 to 10. |
+
+Saving a health setting in Settings starts a round of checks at once.
 
 See [Health checks](HEALTH_CHECKS.md).
 
@@ -67,13 +75,14 @@ See [Health checks](HEALTH_CHECKS.md).
 
 A custom theme's `tokens` are colours as `#rrggbb`: `bg`, `surface`, `surface-2`,
 `ink`, `ink-2`, `mute`, `line`, `accent`, `accent-ink`, `accent-soft`, `accent-softer`,
-`accent-text`. `dark` says which built-in theme supplies the rest.
+`accent-text`. `dark` says which built-in theme supplies the rest: the status lights,
+warning and delete colours, and the fainter text and lines.
 
 ## Environment variables
 
 | Variable | Meaning |
 | --- | --- |
-| `AR_CONFIG` | Path of the config file to use instead of `./config.json`. |
+| `AR_CONFIG` | Path of the config file to use instead of `./config.json`, for a run by hand. `ROUTER.sh` passes the file it uses on to the server. |
 | `PORT` | Overrides `server.port` for this run. |
 | `AR_NO_OPEN` | Set to `1` so `ROUTER.sh --start` does not open the browser. |
 | `AR_NO_AUTOSTART` | Set to `1` so `ROUTER.sh` ignores an installed automatic start. |

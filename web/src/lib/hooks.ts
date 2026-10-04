@@ -32,7 +32,8 @@ export interface AppState {
 /** Login state — always answered, even before signing in. */
 export const useAuth = () => useQuery({ queryKey: ["auth"], queryFn: () => api.get<AuthState>("/api/auth/me") });
 export const useAppState = (enabled = true) => useQuery({ queryKey: ["state"], queryFn: () => api.get<AppState>("/api/state"), enabled });
-export const usePage = (enabled = true) => useQuery({ queryKey: ["page"], queryFn: () => api.get<PageData>("/api/page"), enabled });
+/** The links and directories. Asked again every half minute, so a page left open follows changes made from another device. */
+export const usePage = (enabled = true) => useQuery({ queryKey: ["page"], queryFn: () => api.get<PageData>("/api/page"), enabled, refetchInterval: 30_000 });
 /** The status lights, asked again every few seconds so the page follows the checks. */
 export const useStatus = (enabled = true) => useQuery({
   queryKey: ["status"], enabled, queryFn: () => api.get<StatusReport>("/api/status"),

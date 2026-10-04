@@ -3,11 +3,14 @@ import type { Light, LinkStatus } from "../../../shared/types";
 /** Tile colours: white letters read on every one of these (4.5:1 or better). */
 export const TILE_COLORS = ["#2b59d9", "#0f766e", "#7a3fc4", "#3f5468", "#b4491f", "#1f6f43", "#9b2c5e", "#5a4fcf", "#8a5a00", "#0b6a8f"];
 
-/** "My Business Manager" → "MB", "JARVIS" → "JA", "NAS" → "NA". */
+/** What a person sees as one character: "é", "🎬" and a flag each count once. */
+export const characters = (s: string): string[] => [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].map((x) => x.segment);
+
+/** "My Business Manager" → "MB", "JARVIS" → "JA", "NAS" → "NA", "🎬 Plex" → "🎬P". */
 export function initials(name: string): string {
-  const words = name.trim().split(/[\s_\-./]+/).filter(Boolean);
+  const words = name.trim().split(/[\s_\-./]+/).filter(Boolean).map(characters);
   if (!words.length) return "?";
-  const pick = words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0];
+  const pick = words.length === 1 ? words[0].slice(0, 2).join("") : words[0][0] + words[1][0];
   return pick.toUpperCase();
 }
 

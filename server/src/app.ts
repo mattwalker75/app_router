@@ -11,7 +11,7 @@ import cookieSession from "cookie-session";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { Auth } from "./auth.js";
-import { Config, ROOT } from "./config.js";
+import { Config, ConfigError, ROOT } from "./config.js";
 import { HealthChecker } from "./health.js";
 import { hostGuard, networkUrls, sameOriginWrites, shortHostname, type Listening } from "./security.js";
 import { Service } from "./service.js";
@@ -74,7 +74,7 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
     users.signIn(req, await auth.login(req.body?.loginName, req.body?.password));
     return users.state(req);
   }));
-  app.post("/api/auth/logout", h((req) => { req.session = null; return { ok: true }; }));
+  app.post("/api/auth/logout", h((req) => { auth.revoke(req); req.session = null; return { ok: true }; }));
 
   // ---------------------------------------------------------------- everything else needs a login when the login is on
   app.use(["/api", "/icons"], (req, res, next) => {
@@ -125,7 +125,8 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
     const f = service.iconFile(param(req, "name"));
     if (!f) { res.status(404).end(); return; }
     res.set("cache-control", "private, max-age=86400");
-    res.sendFile(f);
+    // with `root`, only the file's own name is checked for a leading dot — not the folders above it
+    res.sendFile(path.basename(f), { root: path.dirname(f) });
   });
 
   // ---------------------------------------------------------------- export / import
@@ -142,8 +143,13 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
   // ---------------------------------------------------------------- settings
   app.get("/api/settings", h(() => ({ config: config.get(), restartRequired: config.restartRequired(), configFile: config.file })));
   app.put("/api/settings", h((req) => {
-    const r = config.update(settingsPatch(req.body));
-    return { config: config.get(), restartRequired: r.restartRequired };
+    const patch = settingsPatch(req.body) as { security?: { passwordFile?: string }; health?: unknown };
+    // the users live in the password file: when its place changes, the file goes with it
+    if (patch.security?.passwordFile !== undefined) auth.moveFile(config.resolve(patch.security.passwordFile));
+    const r = config.update(patch);
+    // new timing, or the master switch back on: start a round now instead of waiting out the old interval
+    if (patch.health) health.settingsChanged();
+    return { config: config.get(), restartRequired: r.restartRequired, restartNow: r.restartNow };
   }));
 
   app.use("/api", (_req, res) => { res.status(404).json({ error: "No such action." }); });
@@ -153,16 +159,17 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
   app.use(express.static(web, { index: false, maxAge: "1h", setHeaders: (res, f) => { if (f.endsWith(".html")) res.set("cache-control", "no-cache"); } }));
   app.get(/^\/(?!api\/|icons\/).*/, (_req, res) => {
     const index = path.join(web, "index.html");
-    if (fs.existsSync(index)) { res.set("cache-control", "no-cache"); res.sendFile(index); }
+    if (fs.existsSync(index)) { res.set("cache-control", "no-cache"); res.sendFile("index.html", { root: web }); }
     else res.status(503).type("text").send("The page is not built yet. Run ./INSTALL_APP.sh (or npm run build).");
   });
 
   // ---------------------------------------------------------------- errors
   app.use((e: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (e instanceof UserError) { res.status(e.status).json({ error: e.message, details: e.details }); return; }
+    if (e instanceof ConfigError) { res.status(409).json({ error: `Nothing was saved: ${e.message}` }); return; }
     const err = e as { type?: string; message?: string };
     if (err.type === "entity.parse.failed") { res.status(400).json({ error: "The request was not valid JSON." }); return; }
-    if (err.type === "entity.too.large") { res.status(413).json({ error: "That is too large to send. Pictures can be up to 1 MB." }); return; }
+    if (err.type === "entity.too.large") { res.status(413).json({ error: "That is too large to send. A picture can be up to 1 MB, an import file up to 5 MB." }); return; }
     console.error("[error]", e);
     res.status(500).json({ error: `Something went wrong: ${err.message || e}` });
   });
@@ -172,7 +179,12 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
 
 /** Only the settings a person may change, with types checked. The login switch has its own actions (/api/auth/enable, /disable). */
 export function settingsPatch(body: unknown): Record<string, unknown> {
-  const b = (body && typeof body === "object" ? body : {}) as Record<string, Record<string, unknown>>;
+  const b = (body && typeof body === "object" && !Array.isArray(body) ? { ...body } : {}) as Record<string, Record<string, unknown>>;
+  // each group must itself be a group of settings — {"server": "x"} is a mistake, said plainly
+  for (const k of ["server", "security", "data", "page", "health", "appearance"]) {
+    if (b[k] === undefined) continue;
+    if (!b[k] || typeof b[k] !== "object" || Array.isArray(b[k])) throw new UserError(`“${k}” must be a group of settings, like {"${k}": { … }}.`);
+  }
   const out: Record<string, unknown> = {};
   const num = (v: unknown, min: number, max: number, what: string) => {
     const n = Number(v);
