@@ -4,6 +4,11 @@ All notable changes to App Router are listed here, newest first.
 
 ## [Unreleased]
 
+### Changed
+- 2026-10-04: **Simpler tiles.** A tile no longer has a line for the address or port — it
+  shows the name, the description (now on up to two lines) and the status light. Hover a
+  tile to see where it goes. Search still finds a link by its address.
+
 ### Fixed
 - 2026-10-04: **A review of the first version.** Everything below came from reading the code
   again and from an independent review; each fix has a test.

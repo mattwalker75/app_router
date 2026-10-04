@@ -7,7 +7,9 @@ rename (it starts as **Apps**). Below that, each top-level directory has its own
 section. A directory inside a directory is a tile; click it to see that directory on
 its own, with a trail at the top to get back.
 
-Click a link's tile to open it. Hover a status light to see why it is that colour.
+A tile shows the link's name, its description if it has one, and its status light.
+Click a tile to open it. Hover a tile to see where it goes, and a status light to see
+why it is that colour.
 
 A page left open keeps itself current: the lights are asked for again every few
 seconds, and the links and directories every half minute, so a change made from another
@@ -24,7 +26,7 @@ in, with **Change my password** and **Sign out**.
 | Field | What it is |
 | --- | --- |
 | Name shown on the page | The tile's name. The only thing every link needs. |
-| Description | Optional. Shown on the tile and searched. |
+| Description | Optional. Shown on the tile under the name, on up to two lines, and searched. |
 | This app runs on the same computer as App Router | Ticked: give a **Port**, and a **Path** only if the app does not live at the root of its port. Unticked: give a full **Address** and, if you like, a **Port**. |
 | Type | `http` or `https`, for an app on this computer. |
 | Directory | Where the tile goes. The main page, or any directory. |
@@ -79,8 +81,8 @@ quick swipe scrolls the page as usual.
 
 ## Search
 
-The box at the top finds links by name, description, address (the whole address, not
-only the part shown on the tile) or directory name, and directories by name. Press `/` to jump to it and Escape to clear it. It can be hidden in
+The box at the top finds links by name, description, address or directory name, and
+directories by name. Press `/` to jump to it and Escape to clear it. It can be hidden in
 Settings → Page.
 
 ## Settings

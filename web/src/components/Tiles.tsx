@@ -82,14 +82,16 @@ export function LinkTile({ link, status, now, hostname, computer, container, edi
   const href = linkHref(link, hostname);
   return (
     <Sortable id={`L:${link.id}`} data={{ kind: "link", id: link.id, container }} disabled={!editing}>
-      <a href={href} draggable={false} onClick={swallowAfterDrag} title={link.description || undefined}
+      {/* the tile does not spell out where it goes (Matt: not needed) — hovering it does */}
+      <a href={href} draggable={false} onClick={swallowAfterDrag} title={displayAddress(link, computer)}
         {...(link.openIn === "new" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         className={cx("flex h-full items-center gap-3.5 rounded-[14px] border border-line bg-surface p-4 text-ink no-underline transition hover:border-line-2 hover:shadow-lift", editing && menu && "pr-10")}>
         <TileIcon link={link} />
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="line-clamp-2 text-[16px] font-semibold leading-snug [overflow-wrap:anywhere]">{link.name}</span>
-          <span className="line-clamp-2 text-[13px] text-mute [overflow-wrap:anywhere]">{caption ?? displayAddress(link, computer)}</span>
-          {link.description && !caption && <span className="truncate text-[13px] text-faint">{link.description}</span>}
+          {/* in search results: which directory it is in */}
+          {caption && <span className="truncate text-[13px] text-faint">{caption}</span>}
+          {link.description && <span className="line-clamp-2 text-[13px] leading-snug text-mute [overflow-wrap:anywhere]">{link.description}</span>}
           <StatusLine status={status} now={now} />
         </span>
       </a>

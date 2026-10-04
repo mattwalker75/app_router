@@ -21,6 +21,8 @@ a plain sentence.
 1. **Matt's chosen design is "A · Launchpad"** (mockups artifact G2Bgrb2zpjvqoYZgAkqPeL): tiles in
    a grid, the main page's links first, then one section per top-level directory; a directory
    inside a directory is a tile. Figtree, blue accent, 14px tile corners. Keep it.
+   **A link's tile shows its name, its description (up to two lines) and its status — no
+   address or port line** (Matt removed it, Oct 2026). Where it goes is in the tile's tooltip.
 2. **It is a launcher, not a proxy.** Links open the apps on their own ports. Never route
    traffic through App Router, and never require a change to the other apps. Each app keeping
    its own login is intentional (Matt: access to App Router is not access to the apps).
