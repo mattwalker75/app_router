@@ -126,7 +126,10 @@ export class HealthChecker {
     for (const id of this.tracked.keys()) if (!ids.has(id)) this.tracked.delete(id);
     if (this.stopped) return;
     const fresh = links.filter((l) => this.tracked.get(l.id)?.url !== checkUrl(l));
-    if (fresh.length) void Promise.all(fresh.map((l) => this.checkOne(l)));
+    // eight at a time, like a round — an import of two hundred links must not ask two hundred apps at once
+    const queue = [...fresh];
+    const worker = async () => { for (let l = queue.shift(); l; l = queue.shift()) await this.checkOne(l); };
+    void Promise.all(Array.from({ length: Math.min(8, queue.length) }, worker));
   }
 
   /** Check every link that has checks on. Runs one round at a time. */

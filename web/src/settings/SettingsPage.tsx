@@ -2,7 +2,7 @@
  * Settings: every key in config.json, grouped. Each card saves only its own
  * keys, and each field says whether it applies immediately or needs a restart.
  */
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { RotateCw } from "lucide-react";
 import { toast } from "sonner";
@@ -53,19 +53,27 @@ export function useSaveSettings() {
 
 export function SettingsPage({ state, section }: { state: AppState; section: string }) {
   const active = SECTIONS.some(([id]) => id === section) ? section : "page";
+  // on a phone the sections are a row that scrolls sideways: bring the chosen one into view (the row only, never the page)
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const n = nav.current, b = n?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (n && b && n.scrollWidth > n.clientWidth) n.scrollLeft += b.getBoundingClientRect().left - n.getBoundingClientRect().left - 16;
+  }, [active]);
+  const savedIn = <>App Router {state.version}<br />Settings are saved in<br /><span className="break-all font-mono text-[12px]">{state.configFile}</span></>;
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-1 flex-wrap items-start gap-6 px-4 pb-14 pt-7 sm:px-8">
-      <nav aria-label="Settings sections" className="flex flex-[1_1_220px] flex-col gap-1 rounded-2xl border border-line bg-surface p-2.5 sm:max-w-[260px]">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col gap-5 px-4 pb-14 pt-5 sm:px-8 md:flex-row md:items-start md:gap-6 md:pt-7">
+      {/* beside the settings on a wide screen; on a phone a row of names that scrolls sideways, so the settings themselves start at the top */}
+      <nav ref={nav} aria-label="Settings sections" className="no-scrollbar flex gap-1 rounded-2xl border border-line bg-surface p-1.5 max-md:-mx-4 max-md:overflow-x-auto max-md:rounded-none max-md:border-x-0 max-md:px-4 sm:max-md:-mx-8 sm:max-md:px-8 md:w-[240px] md:shrink-0 md:flex-col md:p-2.5">
         {SECTIONS.map(([id, name, hint]) => (
           <button key={id} type="button" onClick={() => go(`/settings/${id}`)} aria-current={id === active ? "page" : undefined}
-            className={cx("flex min-h-12 cursor-pointer flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left", id === active ? "bg-accent-soft text-accent-text" : "text-ink-2 hover:bg-surface-2")}>
+            className={cx("flex min-h-11 shrink-0 cursor-pointer flex-col items-start justify-center whitespace-nowrap rounded-xl px-3.5 py-1.5 text-left md:min-h-12 md:whitespace-normal md:px-3", id === active ? "bg-accent-soft text-accent-text" : "text-ink-2 hover:bg-surface-2")}>
             <span className={cx("text-[15px]", id === active ? "font-bold" : "font-semibold")}>{name}</span>
-            <span className={cx("text-[12.5px]", id === active ? "text-accent-text" : "text-mute")}>{hint}</span>
+            <span className={cx("text-[12.5px] max-md:hidden", id === active ? "text-accent-text" : "text-mute")}>{hint}</span>
           </button>
         ))}
-        <div className="px-3 pb-1 pt-4 text-[12.5px] leading-relaxed text-mute">App Router {state.version}<br />Settings are saved in<br /><span className="break-all font-mono text-[12px]">{state.configFile}</span></div>
+        <div className="px-3 pb-1 pt-4 text-[12.5px] leading-relaxed text-mute max-md:hidden">{savedIn}</div>
       </nav>
-      <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-5">
+      <div className="@container flex min-w-0 flex-1 flex-col gap-5">
         {state.restartRequired.length > 0 && (
           <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl bg-warn-soft px-4 py-3 text-[14px] text-warn">
             <RotateCw size={17} className="shrink-0" />
@@ -78,6 +86,7 @@ export function SettingsPage({ state, section }: { state: AppState; section: str
         {active === "health" && <HealthSection state={state} />}
         {active === "access" && <AccessSection state={state} />}
         {active === "backup" && <BackupSection state={state} />}
+        <div className="px-1 text-[12.5px] leading-relaxed text-mute md:hidden">{savedIn}</div>
       </div>
     </div>
   );

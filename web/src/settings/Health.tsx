@@ -45,7 +45,7 @@ export function HealthSection({ state }: { state: AppState }) {
           onChange={(v) => save({ health: { enabled: v } }, v ? "Health checks are on." : "Health checks are off — every light is grey.")}>
           Off: nothing is checked and every light is grey. Each link also has its own switch (Change… on its tile), so one link can opt out.
         </ToggleRow>
-        <div className="grid gap-x-6 gap-y-2.5 rounded-xl bg-surface-2 px-4 py-3.5 text-[14px] sm:grid-cols-2">
+        <div className="grid gap-x-6 gap-y-2.5 rounded-xl bg-surface-2 px-4 py-3.5 text-[14px] @xl:grid-cols-2">
           <span className="flex items-center gap-2.5"><LightDot light="online" /><span><b className="text-ok">Online</b> — it answered.</span></span>
           <span className="flex items-center gap-2.5"><LightDot light="recovered" /><span><b className="text-warn">Just back</b> — answering again after being down.</span></span>
           <span className="flex items-center gap-2.5"><LightDot light="down" /><span><b className="text-danger">Down</b> — no answer, or a server error.</span></span>
@@ -58,7 +58,7 @@ export function HealthSection({ state }: { state: AppState }) {
         </div>
       </Card>
       <Card title="Timing" sub="Saving starts a round of checks at once, with the new timing.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <Field label="Check every (seconds)" htmlFor="h-int" badge={<ApplyBadge />} hint="5 to 3600. 30 is a good default."><TextInput id="h-int" inputMode="numeric" value={interval} onChange={(e) => setIntervalS(digits(e.target.value))} /></Field>
           <Field label="Wait for an answer (seconds)" htmlFor="h-to" badge={<ApplyBadge />} hint="1 to 60. No answer in this time counts as a failed check."><TextInput id="h-to" inputMode="numeric" value={timeout} onChange={(e) => setTimeoutS(digits(e.target.value))} /></Field>
           <Field label="Stay yellow after coming back (minutes)" htmlFor="h-rec" badge={<ApplyBadge />} hint="0 to 1440. 0 means straight back to green."><TextInput id="h-rec" inputMode="numeric" value={recovered} onChange={(e) => setRecovered(digits(e.target.value))} /></Field>

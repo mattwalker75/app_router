@@ -30,8 +30,8 @@ installs anything on the computer.
 | --- | --- |
 | `service.test.ts` | Links, directories, order and moving, pictures, the file on disk, export and import |
 | `health.test.ts` | Real checks against stand-in apps; green, yellow, red and grey |
-| `api.test.ts` | The routes, the changes switch, settings, guards |
-| `users.test.ts` | The login, users, the password file, the sign-in limit |
+| `api.test.ts` | The routes, the changes switch, settings (a config edited by hand, places that cannot be used), guards |
+| `users.test.ts` | The login, users, the password file and where it may be kept, the theme before signing in, the sign-in limit |
 | `listen.test.ts` | Listening on this computer only, the low-port filter, the network |
 | `page.test.ts` | Light labels, tile colours, and that a drop on screen matches the server |
 | `scripts.test.ts` | `ROUTER.sh` and `AUTOSTART.sh` run for real in a scratch copy, with a stand-in `launchctl` and a scratch home folder. macOS only, and skipped until the app is built. |
@@ -64,6 +64,16 @@ a single-tab driver.
   saving something else never wipes what is being typed.
 - **Destructive actions need a typed word** in the page and on the server: `DELETE`,
   `REPLACE`, `DISABLE`.
-- **Buttons and fields are 44 px tall**; the page must work at phone width.
+- **Three sizes, one page.** Buttons and fields are 44 px tall. The few smaller
+  controls (a tile's ⋯, a window's ✕, small buttons, colour swatches) grow to 40 px
+  under a finger with `pointer-coarse:`, and text boxes use 16 px text there — a phone
+  zooms the whole page in when a smaller box is tapped. Layout changes use Tailwind's
+  breakpoints: below `lg` (1024 px) the header's search box gets its own line; below
+  `md` (768 px) Settings shows its sections as a sliding row; below `sm` (640 px) the
+  header leaves out the computer's name. Field grids inside Settings use container
+  queries (`@xl:`), because the room they have depends on the menu beside them, not on
+  the screen. Anything shown only on hover needs another way on a touch screen (a
+  link's **Details…**). Heights use `dvh`, never `vh`. Check a change at 1440, 820 and
+  390 px wide, with and without touch.
 - **README stays high-level.** Detail goes in `Docs/`.
 - **One commit per feature**, with a dated entry in `CHANGELOG.md`.

@@ -31,7 +31,7 @@ export function DirectoryDialog({ state, tree, rootName, onClose }: { state: Dir
   const where = state.mode === "new" && parentId ? `Inside ${pathText(tree, parentId)}.` : state.mode === "new" ? `On the main page (${rootName}).` : undefined;
   return (
     <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title={title} description={state.mode === "new" ? "Directories group links, the way bookmark folders do. They can hold other directories." : undefined} className="w-[min(480px,94vw)]">
-      <form className="flex flex-col gap-4 px-6 pb-6 pt-4" onSubmit={submit}>
+      <form className="flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-6 sm:pb-6" onSubmit={submit}>
         {state.mode !== "move" && <Field label="Name" htmlFor="d-name" hint={where}><TextInput id="d-name" autoFocus maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></Field>}
         {state.mode !== "rename" && (
           <Field label={state.mode === "move" ? "Move it into" : "Where"} htmlFor="d-parent">

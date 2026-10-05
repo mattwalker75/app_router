@@ -33,8 +33,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal open={!!opts} onOpenChange={(v) => { if (!v) done(false); }} title={opts?.title || ""}>
         {opts && (
-          <form className="flex flex-col gap-4 px-6 pb-6 pt-3" onSubmit={(e) => { e.preventDefault(); if (ready && !opts.infoOnly) done(true); }}>
-            <div className="text-[14px] leading-relaxed text-ink-2">{opts.message}</div>
+          <form className="flex flex-col gap-4 px-4 pb-5 pt-3 sm:px-6 sm:pb-6" onSubmit={(e) => { e.preventDefault(); if (ready && !opts.infoOnly) done(true); }}>
+            <div className="text-[14px] leading-relaxed text-ink-2 [overflow-wrap:anywhere]">{opts.message}</div>
             {opts.typeToConfirm && (
               <label className="flex flex-col gap-1.5 text-[13px] text-mute">
                 <span>Type <b className="font-mono text-ink">{opts.typeToConfirm}</b> to confirm</span>

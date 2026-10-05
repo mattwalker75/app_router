@@ -4,12 +4,71 @@ All notable changes to App Router are listed here, newest first.
 
 ## [Unreleased]
 
+### Added
+- 2026-10-04: **Details for every link.** A link's ⋯ menu starts with **Details…**: the
+  whole description, the address it opens, where it sits on the page, and its status with
+  the reason and the address that is checked. A tile cuts a long name and description
+  short and shows the rest only on hover; a phone or tablet has nothing to hover with, so
+  there the ⋯ stays even when changes to the page are off, with Details alone in it.
+- 2026-10-04: **The sign-in screen wears your theme.** It used to follow the device's
+  light or dark setting whatever was chosen in Settings. The theme is now answered before
+  signing in (`GET /api/appearance`, colours only) and remembered in each browser, so a
+  reload does not flash the default look either.
+
 ### Changed
+- 2026-10-04: **Reviewed on a computer, a tablet and a phone.** Nothing was broken at any
+  size; these make the smaller ones comfortable. The page on a computer looks as before.
+  - **Header.** On a tablet held upright the search box and the summary of the lights get
+    a line of their own instead of wrapping unevenly. On a phone the header is two lines
+    instead of three: the computer's name is left out and the signed-in user is a picture.
+    A long title wraps instead of pushing the buttons off the screen.
+  - **Settings on a phone.** The sections are a row you slide sideways, so the settings
+    start at the top instead of below a tall menu. Pairs of boxes sit side by side only
+    when there is room for both, judged by the room they have and not by the screen.
+  - **Under a finger.** Text boxes use 16px text (a phone zooms the whole page in for
+    anything smaller). The small controls — a tile's ⋯, a window's ✕, the eye in a password
+    box, colour swatches, the drag handle, theme buttons — are 40px. Menu rows are taller.
+  - **Long names** wrap everywhere: a directory's heading keeps its folder picture beside
+    it, the trail keeps each arrow with its name, and a window's title, a user's name and
+    a search for a long word no longer make anything scroll sideways.
+  - **A new screen starts at its top.** Opening a directory, Settings or a Settings
+    section used to keep the scroll position of the screen before.
+  - The add-link form puts the port and the type on one line on a phone.
 - 2026-10-04: **Simpler tiles.** A tile no longer has a line for the address or port — it
   shows the name, the description (now on up to two lines) and the status light. Hover a
   tile to see where it goes. Search still finds a link by its address.
 
 ### Fixed
+- 2026-10-04: **A second review** — the code read again and checked by an independent
+  review; each fix has a test (130 in all).
+  - **Password file.** If the new place could not be saved (config.json broken by hand),
+    the file had already moved, and the next visitor was asked to create a login. It is now
+    put back. With no users yet, Settings accepted any existing file as the password file;
+    now only a place with no file, or a real password file. The links file and the pictures
+    folder are checked the same way before they are saved.
+  - **config.json edited by hand.** A value of the wrong kind (text where a list belongs,
+    `null` for a group) made every request fail. Such a value now falls back to its default.
+  - **Links file edited by hand.** An id with anything but lowercase letters and digits
+    broke that link's picture and could write a file outside the pictures folder. Such ids
+    are replaced when the file is read, and a picture name the app did not make is dropped.
+  - **Links.** `mailto:` and other non-web addresses are refused instead of being bent into
+    a web address. A name or description is measured in characters as people count them,
+    so 80 emoji fit. A malformed request (`"icon": "abc"`, a port of `true`) gets a plain
+    sentence instead of "Something went wrong". An address the browser cannot read no
+    longer shows "Opens about:blank" in the form.
+  - **Settings → Access** listed the addresses for other devices as soon as the switch was
+    saved, before the restart that makes them work, and hid them while they still worked.
+    It now shows the addresses that answer at that moment.
+  - **Deleting a directory** that could not be deleted no longer jumps to its parent.
+  - **Health checks.** New links from an import are checked eight at a time, not all at once.
+  - **`ROUTER.sh`.** After the port was changed in Settings, `--status` and `--stop` said
+    "Not running" about the copy still listening on the old port. They now find it, say
+    that a restart is needed, and stop it. A change to the favicon, the packages or the
+    build settings triggers a rebuild.
+  - **`INSTALL_APP.sh`** checks the Node.js version again after installing it.
+  - **Reading it out loud.** The colour choices are announced as buttons that are pressed
+    or not; the drag handle is skipped by the keyboard (Move earlier / later in the ⋯ menu
+    does that job); the label of the network switch flips it.
 - 2026-10-04: **A review of the first version.** Everything below came from reading the code
   again and from an independent review; each fix has a test.
   - **Login.** Changing the password file's place in Settings while the login was on left

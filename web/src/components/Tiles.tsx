@@ -65,10 +65,10 @@ function Sortable({ id, data, disabled, children }: { id: string; data: Record<s
 
 function TileMenu({ label, items }: { label: string; items: (MenuItem | "sep")[] }) {
   return (
-    <div className="absolute right-1.5 top-1.5" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+    <div className="absolute right-1.5 top-1.5 pointer-coarse:right-0.5 pointer-coarse:top-0.5" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
       <Menu items={items} trigger={
         <button type="button" aria-label={label} title={label}
-          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-faint opacity-70 transition hover:bg-surface-2 hover:text-ink hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100">
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-faint opacity-70 transition hover:bg-surface-2 hover:text-ink hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:h-10 pointer-coarse:w-10 pointer-coarse:opacity-100">
           <MoreHorizontal size={18} />
         </button>} />
     </div>
@@ -82,10 +82,10 @@ export function LinkTile({ link, status, now, hostname, computer, container, edi
   const href = linkHref(link, hostname);
   return (
     <Sortable id={`L:${link.id}`} data={{ kind: "link", id: link.id, container }} disabled={!editing}>
-      {/* the tile does not spell out where it goes (Matt: not needed) — hovering it does */}
+      {/* the tile does not spell out where it goes (Matt: not needed) — hovering it does, and so does Details… in its ⋯ menu */}
       <a href={href} draggable={false} onClick={swallowAfterDrag} title={displayAddress(link, computer)}
         {...(link.openIn === "new" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-        className={cx("flex h-full items-center gap-3.5 rounded-[14px] border border-line bg-surface p-4 text-ink no-underline transition hover:border-line-2 hover:shadow-lift", editing && menu && "pr-10")}>
+        className={cx("flex h-full items-center gap-3.5 rounded-[14px] border border-line bg-surface p-4 text-ink no-underline transition hover:border-line-2 hover:shadow-lift", menu && "pr-10")}>
         <TileIcon link={link} />
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="line-clamp-2 text-[16px] font-semibold leading-snug [overflow-wrap:anywhere]">{link.name}</span>
@@ -95,7 +95,7 @@ export function LinkTile({ link, status, now, hostname, computer, container, edi
           <StatusLine status={status} now={now} />
         </span>
       </a>
-      {editing && menu && <TileMenu label={`Change ${link.name}`} items={menu} />}
+      {menu && <TileMenu label={editing ? `Change ${link.name}` : `More about ${link.name}`} items={menu} />}
     </Sortable>
   );
 }

@@ -6,8 +6,8 @@ import { Button, Field, PasswordInput, TextInput } from "./ui";
 
 function Card({ title, sub, children }: { title: string; sub: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-[430px] rounded-2xl bg-surface p-8 shadow-dialog">
+    <div className="flex min-h-dvh items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-[430px] rounded-2xl bg-surface p-6 shadow-dialog sm:p-8">
         <div className="mb-1 flex items-center gap-2.5">
           <img src="/favicon.svg" alt="" width={30} height={30} className="rounded-lg" />
           <span className="text-[20px] font-bold">App Router</span>

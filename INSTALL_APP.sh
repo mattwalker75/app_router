@@ -50,7 +50,12 @@ echo "App Router — install"; echo
 if have node && [[ "$(node_major)" -ge 22 ]]; then ok "Node.js $(node -v)"
 else
   if have node; then warn "Node.js $(node -v) is too old — 22 or newer is needed"; else warn "Node.js is not installed"; fi
-  if brew_install node "to run the app"; then ok "Node.js $(node -v)"; elif [[ $CHECK_ONLY -eq 0 ]]; then err "Node.js 22+ is still not available."; exit 1; fi
+  if brew_install node "to run the app"; then
+    hash -r 2>/dev/null
+    # an older Node.js can still be the first one found (nvm, an old installer): say so now, not as a failed build later
+    if have node && [[ "$(node_major)" -ge 22 ]]; then ok "Node.js $(node -v)"
+    else err "Node.js was installed, but the one this terminal finds first is still $(node -v 2>/dev/null || echo missing) ($(command -v node 2>/dev/null || echo "not on the PATH")). Open a new terminal window, or remove the older one, then run ./INSTALL_APP.sh again."; exit 1; fi
+  elif [[ $CHECK_ONLY -eq 0 ]]; then err "Node.js 22+ is still not available."; exit 1; fi
 fi
 
 if [[ $CHECK_ONLY -eq 1 ]]; then

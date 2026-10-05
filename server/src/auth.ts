@@ -44,6 +44,15 @@ export const MAX_PASSWORD_BYTES = 72;
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const tagOf = (passwordHash: string) => crypto.createHash("sha256").update(passwordHash).digest("hex").slice(0, 16);
 
+/** Is the file at `file` a password file (one this app wrote, in either of its two shapes)? */
+function looksLikePasswordFile(file: string): boolean {
+  try {
+    const p = JSON.parse(fs.readFileSync(file, "utf8")) as { users?: unknown; loginName?: unknown; passwordHash?: unknown };
+    const list = (Array.isArray(p?.users) ? p.users : [p]) as { loginName?: unknown; passwordHash?: unknown }[];
+    return list.length > 0 && list.every((u) => typeof u?.loginName === "string" && typeof u?.passwordHash === "string");
+  } catch { return false; }
+}
+
 export class Auth {
   /** compared against when the login name is unknown (made on first need) */
   private decoy: string | null = null;
@@ -186,13 +195,22 @@ export class Auth {
    * come along: without this the app would suddenly have no users and ask whoever loads the page
    * first to create one. Refuses when something is already at the new place.
    */
-  moveFile(next: string): void {
+  moveFile(next: string): (() => void) | null {
     const from = this.file();
-    if (path.resolve(next) === path.resolve(from) || !fs.existsSync(from)) return;
-    if (fs.existsSync(next)) throw new UserError(`There is already a file at ${next}. Choose another place for the password file, or remove that file first.`, 409);
+    if (path.resolve(next) === path.resolve(from)) return null;
+    if (fs.existsSync(next)) {
+      if (fs.statSync(next).isDirectory()) throw new UserError(`${next} is a folder. The password file needs a file name, for example ${path.join(next, ".password")}.`, 409);
+      if (fs.existsSync(from)) throw new UserError(`There is already a file at ${next}. Choose another place for the password file, or remove that file first.`, 409);
+      // no users yet: a password file that is already there may be adopted — any other file may not
+      if (!looksLikePasswordFile(next)) throw new UserError(`${next} is another kind of file, not a password file. Choose a place where there is no file yet.`, 409);
+      return null;
+    }
+    if (!fs.existsSync(from)) return null;
     fs.mkdirSync(path.dirname(next), { recursive: true });
     try { fs.renameSync(from, next); }
     catch { fs.copyFileSync(from, next); fs.rmSync(from, { force: true }); } // another disk: copy, then remove
     try { fs.chmodSync(next, 0o600); } catch {}
+    // for the caller, should saving the setting fail after all: put the file back where the setting still points
+    return () => { try { fs.renameSync(next, from); } catch { try { fs.copyFileSync(next, from); fs.rmSync(next, { force: true }); } catch {} } };
   }
 }

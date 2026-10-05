@@ -49,8 +49,19 @@ describe("a link to an app on this computer", () => {
     expect(fail(() => svc.createLink({ name: "  ", port: 80 }))).toMatch(/name can't be empty/);
     expect(fail(() => svc.createLink({ name: "x", port: 80, path: "/a b" }))).toMatch(/spaces/);
     expect(fail(() => svc.createLink({ name: "x", port: 80, path: "http://other/" }))).toMatch(/after the port/);
-    expect(fail(() => svc.createLink({ name: "n".repeat(81), port: 80 }))).toMatch(/under 80/);
+    expect(fail(() => svc.createLink({ name: "n".repeat(81), port: 80 }))).toMatch(/80 characters or fewer/);
     expect(svc.page().links).toHaveLength(0);
+  });
+  it("counts a name the way a person does: an emoji or an accented letter is one character", () => {
+    expect(svc.createLink({ name: "🎬".repeat(80), port: 80 }).name).toHaveLength(160);     // 80 characters, twice that in code units
+    expect(fail(() => svc.createLink({ name: "🎬".repeat(81), port: 80 }))).toMatch(/80 characters or fewer/);
+  });
+  it("a port is a number or digits — and a mistake sent by a script is a plain sentence, not a crash", () => {
+    expect(svc.createLink({ name: "typed", port: "3030" as unknown as number }).port).toBe(3030);
+    expect(fail(() => svc.createLink({ name: "x", port: true as unknown as number }))).toMatch(/1 to 65535/);
+    expect(fail(() => svc.createLink({ name: "x", port: [80] as unknown as number }))).toMatch(/1 to 65535/);
+    expect(fail(() => svc.createLink({ name: "x", port: 80, icon: "abc" as never }))).toMatch(/“icon” must be a group/);
+    expect(fail(() => svc.createLink({ name: "x", port: 80, health: true as never }))).toMatch(/“health” must be a group/);
   });
 });
 
@@ -85,6 +96,12 @@ describe("a link to somewhere else", () => {
     expect(fail(() => svc.createLink({ name: "x", local: false, url: "javascript://alert(1)" }))).toMatch(/Only http/);
     expect(fail(() => svc.createLink({ name: "x", local: false, url: "http://" }))).toMatch(/not an address/);
     expect(fail(() => svc.createLink({ name: "x", local: false, url: "https://ok.example", port: 99999 }))).toMatch(/1 to 65535/);
+  });
+  it("…including the kinds with no // in them, while a name and a port is still fine", () => {
+    expect(fail(() => svc.createLink({ name: "x", local: false, url: "mailto:someone@example.com" }))).toMatch(/Only http/);
+    expect(fail(() => svc.createLink({ name: "x", local: false, url: "javascript:alert(1)" }))).toMatch(/Only http/);
+    expect(svc.createLink({ name: "nas", local: false, url: "nas.local:5001/files" }).url).toBe("http://nas.local:5001/files");
+    expect(svc.createLink({ name: "lh", local: false, url: "localhost:8080" }).url).toBe("http://localhost:8080");
   });
 });
 
@@ -265,6 +282,19 @@ describe("a links file edited by hand", () => {
     expect(lost).toMatchObject({ port: null, directoryId: null, openIn: "new", icon: { text: "", color: "", image: null }, health: { enabled: true, path: "" } });
     expect(s.page().directories[0]).toMatchObject({ id: "d1", name: "Lab", parentId: null });
     expect(typeof bare.createdAt).toBe("string");
+  });
+  it("an id typed by hand that the app would not have made gets a new one, and what pointed at it follows", () => {
+    const s = write({ directories: [{ id: "My Lab", name: "Lab" }, { id: "../../up", name: "Inner", parentId: "My Lab" }],
+      links: [{ id: "../../escape", name: "Odd", port: 1, directoryId: "../../up", icon: { image: "../../etc/passwd" } }, { id: "fine1", name: "Fine", port: 2, directoryId: "My Lab" }] });
+    const p = s.page();
+    for (const x of [...p.directories, ...p.links]) expect(x.id).toMatch(/^[a-z0-9]{1,40}$/);
+    const lab = p.directories.find((d) => d.name === "Lab")!, inner = p.directories.find((d) => d.name === "Inner")!;
+    expect(inner.parentId).toBe(lab.id);
+    expect(p.links.find((l) => l.name === "Odd")).toMatchObject({ directoryId: inner.id, icon: { image: null } });   // a picture name the app never made is no picture
+    expect(p.links.find((l) => l.name === "Fine")).toMatchObject({ id: "fine1", directoryId: lab.id });
+    const odd = p.links.find((l) => l.name === "Odd")!;
+    s.setIcon(odd.id, tinyPng(), "image/png");                                                                           // …and its picture lands inside the pictures folder
+    expect(fs.readdirSync(s.iconsDir())).toEqual([s.page().links.find((l) => l.id === odd.id)!.icon.image]);
   });
   it("things that are not records, and second copies of an id, are left out", () => {
     const s = write({ directories: [null, "x", { id: "d1", name: "A" }, { id: "d1", name: "Twin" }, { name: "No id" }], links: [null, 7, { id: "l1", name: "Ok", port: 1 }, { id: "l1", name: "Twin", port: 2 }] });

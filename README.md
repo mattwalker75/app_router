@@ -13,6 +13,7 @@ gives you a single address with a tile for each one. Click a tile and you are in
 - **Yours to lock down.** Network access, a login with several users, and whether the
   page can be changed at all are switches in Settings.
 - **Light, dark, or your own colours.**
+- **Works on a computer, a tablet and a phone.** The same page rearranges itself to fit.
 
 It is a launcher, not a proxy: your apps are not changed, and each keeps its own login.
 
@@ -32,7 +33,7 @@ everything else, in **Settings** or in `config.json`.
 | | |
 | --- | --- |
 | [Installation](Docs/INSTALLATION.md) | What it needs, installing, starting at boot, moving to another computer |
-| [User guide](Docs/USER_GUIDE.md) | Adding links and directories, dragging, search, Settings |
+| [User guide](Docs/USER_GUIDE.md) | Adding links and directories, dragging, search, Settings, using it on a phone or tablet |
 | [Health checks](Docs/HEALTH_CHECKS.md) | What the lights mean and how a link is checked |
 | [Configuration](Docs/CONFIGURATION.md) | Every key in `config.json` |
 | [Security](Docs/SECURITY.md) | Network access, the login, users, the password file |

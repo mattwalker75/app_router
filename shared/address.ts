@@ -1,6 +1,6 @@
 /**
  * Where a link goes, worked out the same way by the server (for health
- * checks) and by the page (for the tile's address).
+ * checks) and by the page (for the link itself, its tooltip and its Details).
  */
 import type { Link } from "./types.js";
 
@@ -43,7 +43,7 @@ export function withScheme(raw: string): string {
 
 export const linkHref = (link: Addr, hostname: string) => (link.local ? localHref(link, hostname) : remoteHref(link));
 
-/** The short address under a tile's name: "Port 3030 on mac-mini", "nas.local:5001", "pihole.local/admin". */
+/** A short way to say where a link goes (the tile's tooltip): "Port 3030 on mac-mini", "nas.local:5001", "pihole.local/admin". */
 export function displayAddress(link: Addr, computerName: string): string {
   if (link.local) return `Port ${link.port} on ${computerName}${link.path && link.path !== "/" ? ` · ${link.path}` : ""}`;
   try {

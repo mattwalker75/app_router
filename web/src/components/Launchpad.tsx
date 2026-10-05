@@ -11,18 +11,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { closestCenter, DndContext, MouseSensor, pointerWithin, TouchSensor, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, FolderInput, FolderPlus, GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, FolderInput, FolderPlus, GripVertical, Info, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { displayAddress, linkHref } from "../../../shared/address";
+import { checkUrl, displayAddress, linkHref } from "../../../shared/address";
 import type { Directory, Link, PageData, StatusReport } from "../../../shared/types";
 import { api, errorText } from "../lib/api";
-import { plural, tally, tallyVerdict } from "../lib/format";
-import { useLocal, useNow, useRefresh, type AppState } from "../lib/hooks";
+import { lightLabel, lightTitle, plural, tally, tallyVerdict } from "../lib/format";
+import { useLocal, useNow, useRefresh, useTouchScreen, type AppState } from "../lib/hooks";
 import { buildTree, moveDirectoryLocally, moveLinkLocally, pathText } from "../lib/tree";
 import { useConfirm } from "./confirm";
 import { DirectoryDialog, type DirectoryDialogState } from "./DirectoryDialogs";
 import { LinkDialog, type LinkDialogState } from "./LinkDialog";
-import { dragGuard, FolderTile, LightDot, LinkTile } from "./Tiles";
+import { dragGuard, FolderTile, LightDot, LinkTile, StatusLine } from "./Tiles";
 import { Button, cx, IconButton, Menu, type MenuItem } from "./ui";
 
 const ROOT = "root";
@@ -71,6 +71,7 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   const qc = useQueryClient();
   const refresh = useRefresh();
   const confirm = useConfirm();
+  const touch = useTouchScreen();
   const [collapsed, setCollapsed] = useLocal<string[]>("collapsed", []);
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
   const [dirDialog, setDirDialog] = useState<DirectoryDialogState | null>(null);
@@ -90,8 +91,9 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   const summaryFor = (d: Directory) => countText(tree.linksUnder(d.id).length, tree.within(d.id).size - 1);
 
   // ---------------------------------------------------------------- changes
-  const run = async (what: () => Promise<unknown>, done?: string) => {
-    try { await what(); if (done) toast(done); } catch (e) { toast.error(errorText(e)); } finally { await refresh(); }
+  /** Do it, say so, refresh. Answers whether it worked. */
+  const run = async (what: () => Promise<unknown>, done?: string): Promise<boolean> => {
+    try { await what(); if (done) toast(done); return true; } catch (e) { toast.error(errorText(e)); return false; } finally { await refresh(); }
   };
   const moveLink = (l: Link, directoryId: string | null, index: number | null) => {
     qc.setQueryData<PageData>(["page"], (p) => (p ? moveLinkLocally(p, l.id, directoryId, index) : p));
@@ -113,13 +115,29 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
       ? await confirm({ title: `Delete “${d.name}” and everything in it?`, message: <>This also deletes the <b>{inside}</b> inside it. This can't be undone (Settings → Backup can export the page first).</>, confirmLabel: "Delete directory", danger: true, typeToConfirm: "DELETE" })
       : await confirm({ title: `Delete “${d.name}”?`, message: "The directory is empty.", confirmLabel: "Delete directory", danger: true });
     if (!ok) return;
-    await run(() => api.del(`/api/directories/${d.id}`, inside ? { confirm: "DELETE" } : undefined), `Deleted “${d.name}”.`);
-    if (dirId && tree.within(d.id).has(dirId)) window.location.hash = d.parentId ? `#/d/${d.parentId}` : "#/";
+    const gone = await run(() => api.del(`/api/directories/${d.id}`, inside ? { confirm: "DELETE" } : undefined), `Deleted “${d.name}”.`);
+    if (gone && dirId && tree.within(d.id).has(dirId)) window.location.hash = d.parentId ? `#/d/${d.parentId}` : "#/";
   };
 
+  // Everything a tile leaves out or cuts short — where the link goes, the whole description, why a
+  // light is red. A mouse shows some of it on hover; a finger has nothing to hover with.
+  const details = (l: Link): MenuItem => ({ label: "Details…", icon: <Info size={15} />, onSelect: () => {
+    const st = status?.links[l.id];
+    const row = (label: string, value: ReactNode) => <div className="flex flex-col gap-0.5"><dt className="text-[12.5px] font-semibold text-mute">{label}</dt><dd className="m-0 [overflow-wrap:anywhere]">{value}</dd></div>;
+    void confirm({ title: l.name, infoOnly: true, message: (
+      <dl className="m-0 flex flex-col gap-3 text-[14.5px] text-ink">
+        {l.description && row("Description", l.description)}
+        {row("Opens", <><span className="font-mono text-[13.5px]">{linkHref(l, hostname)}</span><span className="block text-[13px] text-mute">{l.local ? `An app on this computer (${computer}), port ${l.port}.` : "Somewhere else."} Opens in {l.openIn === "same" ? "the same tab" : "a new tab"}.</span></>)}
+        {row("Where it is on the page", l.directoryId ? pathText(tree, l.directoryId) : `${rootName} (the main page)`)}
+        {row("Status", <><StatusLine status={st} now={Date.now()} />{st && lightTitle(st) && <span className="mt-0.5 block text-[13.5px] text-ink-2">{lightTitle(st)}</span>}
+          {l.health.enabled && state.config.health.enabled && <span className="mt-0.5 block text-[13px] text-mute">Checks <span className="font-mono text-[12.5px]">{checkUrl(l)}</span></span>}</>)}
+      </dl>
+    ) });
+  } });
   const linkMenu = (l: Link, siblings: Link[]): (MenuItem | "sep")[] => {
     const i = siblings.findIndex((x) => x.id === l.id);
     return [
+      details(l),
       { label: "Change…", icon: <Pencil size={15} />, onSelect: () => setLinkDialog({ link: l, directoryId: l.directoryId }) },
       { label: "Move earlier", icon: <ArrowUp size={15} />, disabled: i <= 0, onSelect: () => moveLink(l, l.directoryId, i - 1) },
       { label: "Move later", icon: <ArrowDown size={15} />, disabled: i < 0 || i >= siblings.length - 1, onSelect: () => moveLink(l, l.directoryId, i + 1) },
@@ -181,7 +199,7 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
       ids: [...dirs.map((d) => `D:${d.id}`), ...links.map((l) => `L:${l.id}`)],
       nodes: <>
         {dirs.map((d) => <FolderTile key={d.id} dir={d} summary={summaryFor(d)} verdict={verdictFor(d)} container={container} editing={editing} menu={dirMenu(d)} />)}
-        {links.map((l) => <LinkTile key={l.id} link={l} status={status?.links[l.id]} now={now} hostname={hostname} computer={computer} container={container} editing={editing} menu={linkMenu(l, links)} />)}
+        {links.map((l) => <LinkTile key={l.id} link={l} status={status?.links[l.id]} now={now} hostname={hostname} computer={computer} container={container} editing={editing} menu={editing ? linkMenu(l, links) : touch ? [details(l)] : undefined} />)}
       </>,
     };
   };
@@ -208,17 +226,17 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   const q = query.trim().toLowerCase();
   if (q) {
     const hit = (s: string) => s.toLowerCase().includes(q);
-    // the address is searched in full (the tile only shows a shortened one), and as it would open from here
+    // the address is searched in full, and as it would open from here (the tile itself does not show it)
     const links = page.links.filter((l) => hit(l.name) || hit(l.description) || hit(displayAddress(l, computer)) || hit(linkHref(l, hostname)) || hit(l.url) || hit(pathText(tree, l.directoryId)));
     const dirs = page.directories.filter((d) => hit(d.name));
     return wrap(
       <section className="flex flex-col gap-3.5">
-        <div className="flex flex-wrap items-baseline gap-3"><h2 className="text-[20px] font-bold">Search results</h2><span className="text-[13.5px] text-mute">{countText(links.length, dirs.length)} for “{query.trim()}”</span></div>
+        <div className="flex flex-wrap items-baseline gap-3"><h2 className="text-[20px] font-bold">Search results</h2><span className="min-w-0 text-[13.5px] text-mute [overflow-wrap:anywhere]">{countText(links.length, dirs.length)} for “{query.trim()}”</span></div>
         {links.length + dirs.length === 0
-          ? <div className="rounded-[14px] border border-dashed border-line-2 px-6 py-10 text-center text-mute">Nothing on the page matches “{query.trim()}”. Search looks at names, descriptions, addresses and directory names.</div>
+          ? <div className="rounded-[14px] border border-dashed border-line-2 px-6 py-10 text-center text-mute [overflow-wrap:anywhere]">Nothing on the page matches “{query.trim()}”. Search looks at names, descriptions, addresses and directory names.</div>
           : <div className="grid grid-cols-[repeat(auto-fill,minmax(264px,1fr))] gap-3.5">
               {dirs.map((d) => <FolderTile key={d.id} dir={d} summary={summaryFor(d)} verdict={verdictFor(d)} container="search" editing={false} />)}
-              {links.map((l) => <LinkTile key={l.id} link={l} status={status?.links[l.id]} now={now} hostname={hostname} computer={computer} container="search" editing={false}
+              {links.map((l) => <LinkTile key={l.id} link={l} status={status?.links[l.id]} now={now} hostname={hostname} computer={computer} container="search" editing={false} menu={touch ? [details(l)] : undefined}
                 caption={l.directoryId ? `In ${pathText(tree, l.directoryId)}` : undefined} />)}
             </div>}
       </section>,
@@ -233,13 +251,12 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
     return wrap(
       <section className="flex flex-col gap-3.5">
         <nav aria-label="Where you are" className="flex flex-wrap items-center gap-1.5 text-[14px] text-mute">
-          <a href="#/" className="rounded px-1 py-0.5 text-accent-text no-underline hover:underline">{rootName}</a>
-          {trail.slice(0, -1).map((d) => <span key={d.id} className="flex items-center gap-1.5"><ChevronRight size={14} /><a href={`#/d/${d.id}`} className="rounded px-1 py-0.5 text-accent-text no-underline hover:underline">{d.name}</a></span>)}
-          <ChevronRight size={14} /><span className="px-1 text-ink-2">{here.name}</span>
+          <a href="#/" className="rounded px-1 py-0.5 text-accent-text no-underline hover:underline pointer-coarse:py-2.5">{rootName}</a>
+          {trail.slice(0, -1).map((d) => <span key={d.id} className="flex min-w-0 items-center gap-1.5"><ChevronRight size={14} className="shrink-0" /><a href={`#/d/${d.id}`} className="rounded px-1 py-0.5 text-accent-text no-underline [overflow-wrap:anywhere] hover:underline pointer-coarse:py-2.5">{d.name}</a></span>)}
+          <span className="flex min-w-0 items-center gap-1.5"><ChevronRight size={14} className="shrink-0" /><span className="px-1 text-ink-2 [overflow-wrap:anywhere]">{here.name}</span></span>
         </nav>
         <div className="flex flex-wrap items-center gap-3">
-          <Folder size={22} className="text-mute" aria-hidden />
-          <h2 className="text-[22px] font-bold leading-tight">{here.name}</h2>
+          <span className="flex min-w-0 items-start gap-3"><Folder size={22} className="mt-0.5 shrink-0 text-mute" aria-hidden /><h2 className="min-w-0 text-[22px] font-bold leading-tight [overflow-wrap:anywhere]">{here.name}</h2></span>
           <span className="text-[13.5px] text-mute">{countText(t.links.length, t.dirs.length)}</span>
           {editing && <Menu items={dirMenu(here).slice(3)} trigger={<IconButton label={`Change ${here.name}`} bordered><MoreHorizontal size={18} /></IconButton>} />}
           {addButtons(here.id)}
@@ -259,7 +276,7 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
   return wrap(<>
     <section className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-[22px] font-bold leading-tight">{rootName}</h2>
+        <h2 className="min-w-0 text-[22px] font-bold leading-tight [overflow-wrap:anywhere]">{rootName}</h2>
         {!nothing && <span className="text-[13.5px] text-mute">{countText(root.links.length, 0)}</span>}
         {addButtons(null)}
       </div>
@@ -289,7 +306,7 @@ export function Launchpad({ state, page, status, query, dirId }: { state: AppSta
         return (
           <Section key={d.id} dir={d} editing={editing} open={open}
             header={<>
-              <a href={`#/d/${d.id}`} className="flex min-w-0 items-center gap-2.5 rounded-lg text-ink no-underline hover:text-accent-text">
+              <a href={`#/d/${d.id}`} className="flex min-w-0 items-center gap-2.5 rounded-lg text-ink no-underline hover:text-accent-text pointer-coarse:py-2">
                 <Folder size={20} className="shrink-0 text-mute" aria-hidden /><h2 className="truncate text-[19px] font-bold leading-tight">{d.name}</h2>
               </a>
               <span className="text-[13.5px] text-mute">{summaryFor(d)}</span>
@@ -325,8 +342,8 @@ function Section({ dir, editing, open, header, children }: { dir: Directory; edi
       className={cx("flex flex-col gap-3.5", !open && "rounded-[14px] border border-line bg-surface px-4 py-2", isDragging && "opacity-60", dropping && "rounded-[14px] outline-2 outline-dashed outline-offset-4 outline-accent")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {editing && (
-          <button ref={setActivatorNodeRef} type="button" {...listeners} aria-label={`Drag to reorder ${dir.name}`} title="Drag to reorder"
-            className="-ml-1.5 inline-flex h-9 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-faint hover:text-ink"><GripVertical size={17} /></button>
+          <button ref={setActivatorNodeRef} type="button" {...listeners} tabIndex={-1} aria-hidden title="Drag to reorder (or use Move earlier / Move later in the ⋯ menu)"
+            className="-ml-1.5 inline-flex h-9 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-faint hover:text-ink pointer-coarse:-ml-2.5 pointer-coarse:h-11 pointer-coarse:w-10"><GripVertical size={17} /></button>
         )}
         {header}
       </div>

@@ -57,6 +57,19 @@ describe("turning the login on", () => {
     expect((await v("GET", "/api/health")).status).toBe(200);          // the start script's "is it up?" stays open
     expect((await v("GET", "/")).status).not.toBe(401);                // the page itself loads and shows the sign-in screen
   });
+  it("the theme is answered before signing in, so the sign-in screen can wear it — and nothing else is", async () => {
+    const mine = { id: "custom-harbor-1", name: "Harbor", dark: true, tokens: { bg: "#101820", accent: "#ffaa00" } };
+    await s.call("PUT", "/api/settings", { appearance: { theme: "custom-harbor-1", customThemes: [mine] } });
+    await loginOn();
+    const v = visitor();                                                   // nobody is signed in here
+    expect((await v("GET", "/api/state")).status).toBe(401);
+    const a = await v("GET", "/api/appearance");
+    expect(a.status).toBe(200);
+    expect(a.json).toEqual({ theme: "custom-harbor-1", customThemes: [mine] }); // the colours, and only the colours
+    await s.call("PUT", "/api/settings", { appearance: { theme: "dark" } });
+    expect((await v("GET", "/api/appearance")).json.theme).toBe("dark");   // follows a change at once
+  });
+
   it("nobody can create a login from the sign-in page once one exists", async () => {
     await loginOn();
     const v = visitor();
@@ -178,6 +191,26 @@ describe("passwords", () => {
 });
 
 describe("the password file", () => {
+  it("is put back when the new place could not be saved — it is never in one place and named in another", async () => {
+    await loginOn();
+    const file = path.join(s.dir, "config.json"), good = fs.readFileSync(file, "utf8");
+    fs.writeFileSync(file, "{ broken by hand");
+    const r = await s.call("PUT", "/api/settings", { security: { passwordFile: "./secrets/users.json" } });
+    expect(r.status).toBe(409); expect(r.json.error).toMatch(/Nothing was saved/);
+    expect(fs.existsSync(pwFile())).toBe(true);                                             // back where the setting still points
+    expect(fs.existsSync(path.join(s.dir, "secrets/users.json"))).toBe(false);
+    fs.writeFileSync(file, good);
+    expect(await me(visitor())).toEqual({ status: "unauthenticated" });                     // not "create a login"
+    expect(await me(s.call)).toEqual({ status: "authenticated", loginName: "matt" });
+  });
+  it("with no users yet, only a place with no file — or a real password file — is accepted", async () => {
+    fs.mkdirSync(path.join(s.dir, "data"), { recursive: true }); fs.writeFileSync(path.join(s.dir, "data/links.json"), JSON.stringify({ format: "app-router-links", version: 1, directories: [], links: [] }));
+    expect((await s.call("PUT", "/api/settings", { security: { passwordFile: "./data/links.json" } })).json.error).toMatch(/another kind of file, not a password file/);
+    expect((await s.call("PUT", "/api/settings", { security: { passwordFile: "./data" } })).json.error).toMatch(/is a folder/);
+    expect((await s.call("PUT", "/api/settings", { security: { passwordFile: "./elsewhere/.pw" } })).status).toBe(200);
+    expect((await loginOn()).status).toBe(200);                                             // and the login turns on there
+    expect(fs.existsSync(path.join(s.dir, "elsewhere/.pw"))).toBe(true);
+  });
   it("changing where it is kept takes the users along — nobody is locked out, nobody can claim the login", async () => {
     await loginOn();
     await s.call("POST", "/api/users", { loginName: "sarah", password: "sarah-password" });

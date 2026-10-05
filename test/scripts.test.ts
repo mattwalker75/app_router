@@ -97,6 +97,16 @@ describe.skipIf(!canRun)("ROUTER.sh by itself", () => {
     expect(sh("ROUTER.sh", "--stop").out).toMatch(/Not running\./);
     expect(fs.existsSync(path.join(app, "data/router.pid"))).toBe(false);
   });
+  it("after the port is changed in Settings, the copy still on the old port is found, said so, and stopped", async () => {
+    sh("ROUTER.sh", "--start"); expect(await answering()).toBe(true);
+    const cfg = path.join(app, "config.json"), other = await freePort();
+    fs.writeFileSync(cfg, JSON.stringify({ server: { port: other }, health: { enabled: false } }));   // what Settings does: saved, not yet applied
+    const st = sh("ROUTER.sh", "--status");
+    expect(st.out).toMatch(/Running \(pid \d+\) — but it is not answering at .* restart to apply it/);
+    expect(sh("ROUTER.sh", "--stop").out).toMatch(/Stopped\./);
+    expect(await answering()).toBe(false);
+    fs.writeFileSync(cfg, JSON.stringify({ server: { port }, health: { enabled: false } }));
+  });
   it("a pid file left over from before a reboot is not trusted: the other program is never stopped", async () => {
     const pidFile = path.join(app, "data/router.pid");
     fs.writeFileSync(pidFile, String(process.pid));                    // alive, and NOT App Router (it is this test run)
@@ -175,6 +185,16 @@ describe.skipIf(!canRun)("AUTOSTART.sh", () => {
     expect(restart.rc, restart.out).toBe(0); expect(await answering()).toBe(true);
     // a foreground or developer run would fight the system's copy for the port
     for (const how of ["--fg", "--dev"]) { const r = sh("ROUTER.sh", how); expect(r.rc, how).toBe(1); expect(r.out).toMatch(/kept running by the system; stop it first/); }
+  });
+  it("while installed, a port changed in Settings does not hide the running copy from --status and --stop", async () => {
+    const cfg = path.join(app, "config.json"), other = await freePort();
+    fs.writeFileSync(cfg, JSON.stringify({ server: { port: other }, health: { enabled: false } }));
+    expect(sh("ROUTER.sh", "--status").out).toMatch(/kept running by the system — but it is not answering at .* restart to apply it/);
+    const stop = sh("ROUTER.sh", "--stop");
+    expect(stop.rc, stop.out).toBe(0); expect(stop.out).toMatch(/Stopped\./);
+    expect(await answering()).toBe(false);                             // the copy on the OLD port is gone
+    fs.writeFileSync(cfg, JSON.stringify({ server: { port }, health: { enabled: false } }));
+    expect(sh("ROUTER.sh", "--start").rc).toBe(0); expect(await answering()).toBe(true);
   });
   it("installing again is harmless", async () => {
     const r = sh("AUTOSTART.sh", "--install");

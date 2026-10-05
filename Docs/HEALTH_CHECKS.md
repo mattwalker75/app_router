@@ -34,8 +34,9 @@ Those numbers are settings.
 - **An app on this computer** is asked on its port through `localhost`, for example
   `http://localhost:3030/`.
 - **A link elsewhere** is asked at its address.
-- **Address to check** on the link replaces that: a path (`/api/health`) is added to
-  the link's own address, a full address is used as it is.
+- **Address to check** on the link replaces that. A path (`/api/health`) takes the
+  place of the link's own path: a link to `https://nas.example.com/app/` with `/ping`
+  is asked at `https://nas.example.com/ping`. A full address is used as it is.
 
 Because an app on this computer is asked directly, its light shows whether the app is
 **running**. It does not show whether other devices are allowed to reach it; that is
@@ -66,8 +67,15 @@ sites you do not run: there is little point asking GitHub every 30 seconds.
 ## Good to know
 
 - Nothing is remembered between restarts. After a restart every light is "Checking…"
-  for a moment, and "down for" starts counting again.
-- A new or changed link is checked straight away.
+  for a moment, and "down for" starts counting again. A link that is down stays on
+  "Checking…" until it has failed as many checks in a row as the setting asks for — with
+  the defaults, one interval (30 seconds). The same goes for a new link to an app that
+  is not running.
+- A new or changed link is checked straight away. After an import the new links are
+  checked eight at a time, like a round.
+- **Details…** in a link's ⋯ menu shows the reason behind its light ("No answer —
+  nothing is listening there", "Answered with 503") and the address that is checked. With
+  a mouse, hovering the light shows the same.
 - The page asks for the lights again every few seconds, so it follows the checks
   without a reload.
 - The header shows a summary such as `8 online · 1 just back · 1 down`. A directory

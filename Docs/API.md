@@ -7,6 +7,9 @@ that arrives under a name the computer does not answer to gets `421`.
 With the login on, every route except the first group needs a signed-in session cookie
 and otherwise answers `401 { error, auth }`.
 
+A request the page could not have sent — `"icon": "abc"` where a group belongs, a port
+that is not a number — gets `400` and a plain sentence, like any other mistake.
+
 Changes (`POST`, `PUT`, `PATCH`, `DELETE`) must come from a page App Router served.
 Routes marked ✎ are refused with `403` while **Allow changes to the page** is off.
 
@@ -16,6 +19,7 @@ Routes marked ✎ are refused with `403` while **Allow changes to the page** is 
 | --- | --- |
 | `GET /api/health` | `{ ok, app: "app-router", version }`. Used by the scripts. |
 | `GET /api/auth/me` | `{ status }`: `disabled`, `not_initialized`, `unauthenticated`, or `authenticated` with `loginName`. |
+| `GET /api/appearance` | `{ theme, customThemes }` — which theme is chosen, and the names and colours of your own themes. Open so the sign-in and create-a-login screens wear the theme. Nothing else is in it. |
 | `POST /api/auth/login` | `{ loginName, password }` → signs in. Limited to 10 tries per 5 minutes from one address, a limit shared with `setup`, `enable` and `password`. |
 | `POST /api/auth/setup` | `{ loginName, password }` → creates the first user. Only while the login is on and there is no password file. |
 | `POST /api/auth/logout` | Signs out. That session's cookie stops working, copies included. |
@@ -36,7 +40,7 @@ Routes marked ✎ are refused with `403` while **Allow changes to the page** is 
 
 | Route | Does |
 | --- | --- |
-| `GET /api/state` | Version, login state, the whole config, what needs a restart, file paths, the computer's name, how it is listening, network addresses. |
+| `GET /api/state` | Version, login state, the whole config, what needs a restart, file paths, the computer's name, how it is listening, and `networkUrls`: the addresses other devices can use **now** (empty while only this computer is let in, whatever the saved switch says). |
 | `GET /api/page` | `{ directories, links }`, each in order. |
 | `GET /api/status` | `{ enabled, checkedAt, intervalSeconds, links: { <id>: { light, since, checkedAt, ms, detail } } }` |
 | `POST /api/status/check` | Runs a round of checks now and returns the report. |
@@ -72,6 +76,6 @@ Link fields: `name`, `description`, `local`, `scheme`, `port`, `path`, `url`,
 | Route | Does |
 | --- | --- |
 | `GET /api/settings` | `{ config, restartRequired, configFile }` |
-| `PUT /api/settings` | A partial config, for example `{ "page": { "rootName": "My apps" } }`. Known keys are checked and saved; unknown keys are ignored. Returns `{ config, restartRequired, restartNow }`: every key waiting for a restart, and those this save changed. `security.loginEnabled` is refused here: use `/api/auth/enable` and `/disable`. Changing `security.passwordFile` moves the file. Saving a `health` key starts a round of checks. |
+| `PUT /api/settings` | A partial config, for example `{ "page": { "rootName": "My apps" } }`. Known keys are checked and saved; unknown keys are ignored. Returns `{ config, restartRequired, restartNow }`: every key waiting for a restart, and those this save changed. `security.loginEnabled` is refused here: use `/api/auth/enable` and `/disable`. Changing `security.passwordFile` moves the file (and puts it back if the save fails). A new place for the password file, the links file or the pictures folder is refused with `409` when it could not be used: a folder where a file belongs, a file of another kind, a file where the folder belongs. Saving a `health` key starts a round of checks. |
 | `GET /api/export/download` | The links file, as a download. |
 | `POST /api/import` ✎ | `{ document, mode: "add" \| "replace", confirm }`. `replace` needs `confirm: "REPLACE"`. Up to 5 MB. |

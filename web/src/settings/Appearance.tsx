@@ -39,7 +39,7 @@ export function AppearanceSection({ state }: { state: AppState }) {
     <>
       <h1 className="text-[27px] font-bold">Appearance</h1>
       <Card title="Theme" sub="Applies immediately, for everyone who opens the page.">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 pointer-coarse:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
           {PRESETS.map(([id, name, bg, acc, hint]) => (
             <button key={id} type="button" onClick={() => pick(id)} aria-pressed={a.theme === id} title={hint}
               className={cx("flex cursor-pointer flex-col gap-2 rounded-xl border-2 p-2.5 text-left text-[14.5px]", a.theme === id ? "border-accent" : "border-line hover:border-line-2")}>
@@ -51,8 +51,8 @@ export function AppearanceSection({ state }: { state: AppState }) {
               <button type="button" className="cursor-pointer" onClick={() => pick(t.id)} aria-pressed={a.theme === t.id} aria-label={`Use the theme ${t.name}`}>{swatch(t.tokens.bg || "#888888", t.tokens.accent || "#888888")}</button>
               <span className="flex items-center gap-1 font-semibold"><span className="flex-1 truncate">{t.name}</span>
                 {a.theme === t.id && <Check size={16} className="text-accent" />}
-                <button type="button" aria-label={`Change the theme ${t.name}`} onClick={() => preview(t)} className="cursor-pointer rounded p-1.5 text-faint hover:text-ink"><Pencil size={14} /></button>
-                <button type="button" aria-label={`Delete the theme ${t.name}`} onClick={() => remove(t)} className="cursor-pointer rounded p-1.5 text-faint hover:text-danger"><Trash2 size={14} /></button>
+                <button type="button" aria-label={`Change the theme ${t.name}`} onClick={() => preview(t)} className="cursor-pointer rounded p-1.5 text-faint hover:text-ink pointer-coarse:p-[13px]"><Pencil size={14} /></button>
+                <button type="button" aria-label={`Delete the theme ${t.name}`} onClick={() => remove(t)} className="cursor-pointer rounded p-1.5 text-faint hover:text-danger pointer-coarse:p-[13px]"><Trash2 size={14} /></button>
               </span>
             </div>
           ))}

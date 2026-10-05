@@ -43,7 +43,7 @@ export function lightLabel(s: LinkStatus | undefined, now = Date.now()): string 
   }
 }
 
-/** The line shown when you hover a light. */
+/** The reason behind a light: shown when you hover it, and in a link's Details. */
 export function lightTitle(s: LinkStatus | undefined, now = Date.now()): string {
   if (!s) return "";
   const checked = s.checkedAt ? ` · checked ${span(Math.max(0, now - Date.parse(s.checkedAt)))} ago`.replace("moments ago", "just now") : "";

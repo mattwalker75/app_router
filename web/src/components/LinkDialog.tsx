@@ -56,7 +56,8 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
   const draft = { local, scheme, port: port ? Number(port) : null, path: local ? (path && !path.startsWith("/") ? "/" + path : path) : "", url: local ? "" : withScheme(url) };
   const opens = useMemo(() => {
     if (local) return port ? linkHref(draft, window.location.hostname) : "";
-    try { return url.trim() ? linkHref(draft, "") : ""; } catch { return ""; }
+    // an address a browser can't read comes back as "about:blank" — that is nothing to show
+    try { const href = url.trim() ? linkHref(draft, "") : ""; return href === "about:blank" ? "" : href; } catch { return ""; }
   }, [local, scheme, port, path, url]); // eslint-disable-line react-hooks/exhaustive-deps
   const checks = useMemo(() => { try { return opens ? checkUrl({ ...draft, health: { enabled: true, path: healthPath.trim() } }) : ""; } catch { return ""; } }, [opens, healthPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -88,7 +89,7 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
   const previewLink = { name: name || "New link", icon: { text, color, image: null } };
   return (
     <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title={l ? "Change link" : "Add a link"}>
-      <form className="flex flex-col gap-4 px-6 pb-6 pt-4" onSubmit={submit}>
+      <form className="flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-6 sm:pb-6" onSubmit={submit}>
         <Field label="Name shown on the page" htmlFor="k-name"><TextInput id="k-name" autoFocus value={name} maxLength={80} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label={<>Description<Optional /></>} htmlFor="k-desc"><TextInput id="k-desc" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} /></Field>
 
@@ -97,8 +98,8 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
           {local ? (
             <>
               <div className="flex flex-wrap gap-3">
-                <Field label="Port" htmlFor="k-port" className="w-[120px]"><TextInput id="k-port" inputMode="numeric" placeholder="3030" value={localPort} onChange={(e) => setLocalPort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
-                <Field label={<>Path<Optional /></>} htmlFor="k-path" className="min-w-[160px] flex-1"><TextInput id="k-path" placeholder="/" value={path} onChange={(e) => setPath(e.target.value)} /></Field>
+                <Field label="Port" htmlFor="k-port" className="w-[120px] max-sm:flex-1"><TextInput id="k-port" inputMode="numeric" placeholder="3030" value={localPort} onChange={(e) => setLocalPort(e.target.value.replace(/\D/g, "").slice(0, 5))} /></Field>
+                <Field label={<>Path<Optional /></>} htmlFor="k-path" className="min-w-[160px] flex-1 max-sm:order-last max-sm:basis-full"><TextInput id="k-path" placeholder="/" value={path} onChange={(e) => setPath(e.target.value)} /></Field>
                 <Field label="Type" htmlFor="k-scheme" className="w-[110px]"><Select id="k-scheme" value={scheme} onChange={(e) => setScheme(e.target.value === "https" ? "https" : "http")}><option value="http">http</option><option value="https">https</option></Select></Field>
               </div>
               <p className="text-[13.5px] leading-snug text-ink-2">The link uses whatever name you opened App Router with — localhost, this computer's network address, or a Tailscale name — so it works from anywhere App Router does.</p>
@@ -113,13 +114,13 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Field label="Directory" htmlFor="k-dir" className="min-w-[200px] flex-1">
+          <Field label="Directory" htmlFor="k-dir" className="min-w-[200px] flex-1 max-sm:basis-full">
             <Select id="k-dir" value={directoryId ?? ""} onChange={(e) => setDirectoryId(e.target.value || null)}>
               <option value="">{rootName} (the main page)</option>
               {tree.options().map((o) => <option key={o.id} value={o.id}>{"  ".repeat(o.depth + 1)}{o.label}</option>)}
             </Select>
           </Field>
-          <Field label="Open in" htmlFor="k-open" className="w-[170px]">
+          <Field label="Open in" htmlFor="k-open" className="w-[170px] max-sm:w-full">
             <Select id="k-open" value={openIn} onChange={(e) => setOpenIn(e.target.value === "same" ? "same" : "new")}><option value="new">A new tab</option><option value="same">The same tab</option></Select>
           </Field>
         </div>
@@ -127,7 +128,7 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
         <div className="flex flex-col gap-3 rounded-xl border border-line p-4">
           <Checkbox id="k-health" checked={healthOn} onChange={setHealthOn}>Check that it is online and show a status light</Checkbox>
           {healthOn && (
-            <Field label={<>Address to check<Optional /></>} htmlFor="k-hpath" hint={checks ? <>Checks <span className="break-all font-mono text-[12.5px]">{checks}</span>. Any answer counts as online, even a sign-in page.</> : "Leave empty to check the link itself. A path such as /api/health or a full address also works."}>
+            <Field label={<>Address to check<Optional /></>} htmlFor="k-hpath" hint={checks ? <>Checks <span className="break-all font-mono text-[12.5px]">{checks}</span>. Any answer counts as online, even a sign-in page — only no answer, or a server error (500 and up), counts as down.</> : "Leave empty to check the link itself. A path such as /api/health or a full address also works."}>
               <TextInput id="k-hpath" autoCapitalize="none" placeholder="/api/health" value={healthPath} onChange={(e) => setHealthPath(e.target.value)} />
             </Field>
           )}
@@ -141,12 +142,12 @@ export function LinkDialog({ state, tree, computer, rootName, onClose, onDelete 
             <Field label={<>Letters<Optional /></>} htmlFor="k-text" className="w-[110px]"><TextInput id="k-text" placeholder={initials(name || "New link")} value={text} disabled={hasPicture} onChange={(e) => setText(characters(e.target.value).slice(0, 3).join(""))} /></Field>
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-semibold">Colour</span>
-              <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Tile colour">
-                <button type="button" role="radio" aria-checked={!color} aria-label="Automatic colour" title="Automatic" disabled={hasPicture} onClick={() => setColor("")}
-                  className={cx("flex h-8 items-center rounded-lg border px-2 text-[12.5px] font-semibold disabled:opacity-40", !color ? "border-accent text-accent-text" : "border-line-2 text-mute")}>Auto</button>
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Tile colour">
+                <button type="button" aria-pressed={!color} aria-label="Automatic colour" title="Automatic" disabled={hasPicture} onClick={() => setColor("")}
+                  className={cx("flex h-8 cursor-pointer items-center rounded-lg border px-2 text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:px-3 pointer-coarse:text-[13.5px]", !color ? "border-accent text-accent-text" : "border-line-2 text-mute")}>Auto</button>
                 {TILE_COLORS.map((c) => (
-                  <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={`Colour ${c}`} disabled={hasPicture} onClick={() => setColor(c)}
-                    className={cx("h-8 w-8 rounded-lg border-2 disabled:opacity-40", color === c ? "border-ink" : "border-transparent")} style={{ background: c }} />
+                  <button key={c} type="button" aria-pressed={color === c} aria-label={`Colour ${c}`} disabled={hasPicture} onClick={() => setColor(c)}
+                    className={cx("h-8 w-8 cursor-pointer rounded-lg border-2 disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:h-10 pointer-coarse:w-10", color === c ? "border-ink" : "border-transparent")} style={{ background: c }} />
                 ))}
               </div>
             </div>

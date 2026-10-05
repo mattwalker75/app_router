@@ -11,7 +11,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex min-h-dvh items-center justify-center p-6">
         <div role="alert" className="flex max-w-md flex-col items-center gap-3 rounded-2xl bg-surface p-8 text-center shadow-soft">
           <div className="text-xl font-bold">Something on the page went wrong</div>
           <div className="text-mute">Reloading usually fixes it. If it keeps happening, the links file may hold something the page can't draw — restart App Router, which tidies the file's entries when it starts.</div>

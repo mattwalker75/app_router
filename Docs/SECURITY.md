@@ -71,8 +71,10 @@ You cannot remove yourself. Nobody can create a user from the sign-in screen.
 
 ### Passwords
 
-- 8 to 72 characters. Every password box has an eye button to show what you typed.
-  (72 is as much as the password hashing can use; a longer one is refused, not cut.)
+- 8 characters or more, and no longer than the password hashing can use: 72 plain
+  characters, fewer when they are accented letters or emoji (the limit is 72 bytes). A
+  longer one is refused, not cut. Every password box has an eye button to show what you
+  typed.
 - Stored as bcrypt hashes in the password file, `./.password` by default, readable only
   by you. Login names are unique whatever their capitals.
 - Signing in is limited to 10 attempts per 5 minutes from one address. Turning the
@@ -116,13 +118,23 @@ turn it on. Use the login to keep people out.
 - Health checks only record whether something answered. See
   [Health checks](HEALTH_CHECKS.md).
 - A links file edited by hand cannot produce a tile that runs a script: anything that
-  is not an `http` or `https` address opens nothing.
+  is not an `http` or `https` address opens nothing. Nor can it reach outside the
+  pictures folder: an `id` or a picture name the app would not have made is replaced or
+  dropped when the file is read.
+- A new place for the password file is accepted only where there is no file yet, or a
+  password file. The links file and the pictures folder are checked the same way, so a
+  setting can never point the app at some other file of yours.
 
 ## Good to know
 
 - **What is open without a sign-in.** The page's own files (its code and font, with no
-  data in them) and `/api/health`, which the scripts use and which gives the version.
-  Everything else needs a sign-in while the login is on.
+  data in them); `/api/health`, which the scripts use and which gives the version;
+  `/api/auth/me` and the sign-in, sign-out and create-a-login actions; and
+  `/api/appearance`, which gives the chosen theme and the names and colours of your own
+  themes, so the sign-in screen looks like the rest. Everything else — the links, the
+  lights, the pictures, the settings — needs a sign-in while the login is on.
+- **The theme is also remembered in each browser** (colours only), so a reload does not
+  flash the default look first.
 - **Health checks reach out from the server.** Anyone who can change the page can make
   the computer App Router runs on ask for any `http` or `https` address and learn
   whether it answered. With the login off and network access on, that is anyone on the

@@ -43,16 +43,16 @@ export function AccessSection({ state }: { state: AppState }) {
     <>
       <h1 className="text-[27px] font-bold">Access</h1>
       <Card title="Network" sub="Where App Router listens, and whether other devices may open it. Both take effect after a restart.">
-        <div className="grid items-start gap-4 sm:grid-cols-[180px_1fr]">
+        <div className="grid items-start gap-4 @xl:grid-cols-[180px_1fr]">
           <Field label="Port" htmlFor="a-port" badge={<ApplyBadge restart />} hint="80 is the usual web port: no number needed in the address.">
             <TextInput id="a-port" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
           </Field>
-          <Field label="Allow other devices on my network" badge={<ApplyBadge restart />}
+          <Field label="Allow other devices on my network" htmlFor="a-network" badge={<ApplyBadge restart />}
             hint={network ? "Other computers, phones and tablets can open the page at this computer's address. A VPN such as Tailscale counts as a network too." : "Only this computer can open the page."}>
-            <div className="flex h-11 items-center"><Toggle label="Allow other devices on my network" checked={network} onChange={setNetwork} /></div>
+            <div className="flex h-11 items-center"><Toggle id="a-network" label="Allow other devices on my network" checked={network} onChange={setNetwork} /></div>
           </Field>
         </div>
-        {c.server.allowNetwork && state.networkUrls.length > 0 && (
+        {state.networkUrls.length > 0 && ( /* the addresses that answer now — a switch waiting for a restart changes nothing yet */
           <div className="rounded-xl bg-surface-2 px-4 py-3 text-[14px]"><div className="mb-1 text-mute">Open it from another device at:</div>{state.networkUrls.map((u) => <div key={u} className="break-all font-mono text-[13.5px]">{u}</div>)}</div>
         )}
         {!network && lowPort && (
@@ -63,7 +63,7 @@ export function AccessSection({ state }: { state: AppState }) {
         )}
         <Field label="Other names for this computer" htmlFor="a-extra" badge={<ApplyBadge />}
           hint={<>App Router only answers when it is opened by a name this computer really has. If you reach it through a VPN such as Tailscale, add that name here — for example <span className="font-mono">mac-mini.tailnet-name.ts.net</span>. Separate several with commas.</>}>
-          <TextInput id="a-extra" className="font-mono !text-[14px]" autoCapitalize="none" placeholder="none" value={extra} onChange={(e) => setExtra(e.target.value)} />
+          <TextInput id="a-extra" className="font-mono !text-[14px] pointer-coarse:!text-[16px]" autoCapitalize="none" placeholder="none" value={extra} onChange={(e) => setExtra(e.target.value)} />
         </Field>
         <Notice tone="info" icon={<Info size={16} />}>A link to an app on this computer only works from another device if <b>that app</b> also allows network access. App Router's own switch does not open the other apps, and each app keeps its own login.</Notice>
         <div><Button variant="primary" onClick={() => save({ server: { port, allowNetwork: network, extraHosts: extra.split(/[,\s]+/).filter(Boolean) } })}>Save</Button></div>
@@ -72,12 +72,12 @@ export function AccessSection({ state }: { state: AppState }) {
       <Card title="Login" sub={on ? "The login is on: everyone signs in before they see the page." : "The login is off: the page opens straight away for anyone who can reach it, and there are no users."}>
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 px-4 py-3">
           <span className={cx("h-2.5 w-2.5 rounded-full", on ? "bg-ok-light" : "border-2 border-off-light")} />
-          <span className="min-w-[160px] flex-1">{on ? <>Signed in as <b>{state.auth.status === "authenticated" ? state.auth.loginName : ""}</b></> : "Nobody needs to sign in"}</span>
+          <span className="min-w-[160px] flex-1 [overflow-wrap:anywhere]">{on ? <>Signed in as <b>{state.auth.status === "authenticated" ? state.auth.loginName : ""}</b></> : "Nobody needs to sign in"}</span>
           {on ? <Button variant="danger-outline" onClick={turnOff}>Turn the login off…</Button> : <Button variant="primary" onClick={() => setTurningOn(true)}>Turn the login on…</Button>}
         </div>
-        <div className="grid items-start gap-4 sm:grid-cols-[1fr_270px]">
+        <div className="grid items-start gap-4 @xl:grid-cols-[1fr_270px]">
           <Field label="Password file" htmlFor="a-file" badge={<ApplyBadge />} hint={<>Now: <span className="break-all font-mono text-[12.5px]">{state.passwordFile}</span>. Change the path and the file, with its users, is moved there.</>}>
-            <TextInput id="a-file" className="font-mono !text-[14px]" value={file} onChange={(e) => setFile(e.target.value)} />
+            <TextInput id="a-file" className="font-mono !text-[14px] pointer-coarse:!text-[16px]" value={file} onChange={(e) => setFile(e.target.value)} />
           </Field>
           <Field label="Stay signed in for (hours)" htmlFor="a-hours" badge={<ApplyBadge restart />} hint="1 to 720.">
             <TextInput id="a-hours" inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, "").slice(0, 3))} />

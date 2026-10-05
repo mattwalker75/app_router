@@ -153,6 +153,26 @@ describe("settings", () => {
     expect(r.status).toBe(409); expect(r.json.error).toMatch(/Nothing was saved: config.json is not valid JSON/);
     expect(fs.readFileSync(file, "utf8")).toBe("{ broken by hand");            // not written over
   });
+  it("a value of the wrong kind in config.json goes back to its default instead of breaking every request", async () => {
+    const file = path.join(s.dir, "config.json");
+    const c = JSON.parse(fs.readFileSync(file, "utf8"));
+    c.server.extraHosts = "mini.tail1234.ts.net"; c.page = null; c.health.intervalSeconds = "soon"; c.appearance = { theme: 7, customThemes: [null, "x", { id: "t1", name: "Mine", dark: false, tokens: { bg: "#ffffff" } }] }; c._comment = "my own note";
+    fs.writeFileSync(file, JSON.stringify(c));
+    const r = await s.call("PUT", "/api/settings", { page: { title: "Still here" } });   // the next save reads the file again
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.config).toMatchObject({ server: { extraHosts: [] }, page: { title: "Still here", rootName: "Apps", allowEditing: true }, health: { intervalSeconds: 30 }, appearance: { theme: "system", customThemes: [{ id: "t1" }] } });
+    expect((await s.call("GET", "/api/health")).status).toBe(200);
+    expect(JSON.parse(fs.readFileSync(file, "utf8"))._comment).toBe("my own note");
+  });
+  it("a new place for the links file or the pictures folder is refused when the next start could not use it", async () => {
+    fs.writeFileSync(path.join(s.dir, "notes.txt"), "not a links file"); fs.mkdirSync(path.join(s.dir, "afolder"));
+    fs.mkdirSync(path.join(s.dir, "other")); fs.writeFileSync(path.join(s.dir, "other/links.json"), JSON.stringify({ directories: [], links: [] }));
+    expect((await s.call("PUT", "/api/settings", { data: { file: "./notes.txt" } })).json.error).toMatch(/another kind of file, not a links file/);
+    expect((await s.call("PUT", "/api/settings", { data: { file: "./afolder" } })).json.error).toMatch(/is a folder/);
+    expect((await s.call("PUT", "/api/settings", { data: { iconsDir: "./notes.txt" } })).json.error).toMatch(/is a file\. The pictures folder must be a folder/);
+    expect(JSON.parse(fs.readFileSync(path.join(s.dir, "config.json"), "utf8")).data).toEqual({ file: "./data/links.json", iconsDir: "./data/icons" });
+    expect((await s.call("PUT", "/api/settings", { data: { file: "./other/links.json", iconsDir: "./new-pictures" } })).status).toBe(200);   // a links file, and a folder not made yet
+  });
   it("unknown keys are ignored, not written", async () => {
     await s.call("PUT", "/api/settings", { page: { title: "T", evil: 1 }, nonsense: { a: 1 } });
     const onDisk = JSON.parse(fs.readFileSync(path.join(s.dir, "config.json"), "utf8"));

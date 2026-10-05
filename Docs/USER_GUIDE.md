@@ -11,6 +11,11 @@ A tile shows the link's name, its description if it has one, and its status ligh
 Click a tile to open it. Hover a tile to see where it goes, and a status light to see
 why it is that colour.
 
+**Details…** in a link's ⋯ menu shows everything a tile leaves out or cuts short: the
+whole description, the address it opens, where it sits on the page, and its status
+with the reason and the address that is checked. On a phone or tablet, where there is
+nothing to hover with, this is how you see why a light is red.
+
 A page left open keeps itself current: the lights are asked for again every few
 seconds, and the links and directories every half minute, so a change made from another
 device shows up without a reload.
@@ -18,6 +23,20 @@ device shows up without a reload.
 The header shows the page's name, the computer App Router runs on, the search box, a
 summary of the lights, and **Settings**. With the login on it also shows who is signed
 in, with **Change my password** and **Sign out**.
+
+## On a phone or tablet
+
+The page is the same everywhere; it rearranges itself to fit.
+
+| Screen | What changes |
+| --- | --- |
+| A computer, or a tablet on its side | Everything in the header is on one line. Tiles sit three or four across. |
+| A tablet held upright | The search box and the summary of the lights get a line of their own under the name. Tiles sit two across. |
+| A phone | Tiles sit one under the other. The header leaves out the computer's name, and shows who is signed in as a picture only. Settings shows its sections as a row you can slide sideways. Forms stack their boxes. |
+
+On any touch screen the small buttons are larger, a link's ⋯ menu is always there (see
+**Details…** above), and tiles are moved by pressing and holding. Every screen starts
+at its top when you move to it.
 
 ## Add a link
 
@@ -58,7 +77,8 @@ That is remembered per browser.
 
 ## Change, move and delete
 
-Every tile has a ⋯ menu: **Change…**, **Move earlier**, **Move later**, **Delete…**.
+Every link tile has a ⋯ menu: **Details…**, **Change…**, **Move earlier**, **Move
+later**, **Delete…**. A directory tile's menu is the directory menu described above.
 
 Tiles can also be dragged:
 
@@ -71,6 +91,7 @@ Tiles can also be dragged:
 | A directory tile | another directory tile beside it | Reorders them. |
 | A directory tile | a directory tile somewhere else, or a directory's heading | Moves into that directory. |
 | A directory tile | the main page's links, or the free space around them | Becomes a top-level directory. |
+| A directory tile | the links of another section, or the free space around them | Moves into that section's directory. |
 | A top-level directory | another, by the handle at its left | Reorders the sections. |
 
 To move a directory into another one that sits beside it, use **Move to…** in its menu.
@@ -104,6 +125,9 @@ Off, the page is only for clicking. **Add link** and **New directory** disappear
 lose their ⋯ menu and cannot be dragged, and the server refuses any change to links or
 directories. Turn it on again in Settings → Page when you need to change something.
 
+On a touch screen a link keeps its ⋯ with **Details…** alone in it, because there is
+no other way there to see where a link goes or why its light is red.
+
 ### Themes
 
 **System** follows each device's own light or dark setting. **Light** and **Dark** are
@@ -114,5 +138,9 @@ page change; **Save theme** keeps it and applies it. "Based on the dark theme" d
 the colours a theme does not set: the status lights, warnings, the red of delete
 buttons, and the browser's own boxes and scrollbars.
 
-A box you are typing in keeps what you typed when you save or flip something else on
-the same screen. Nothing is saved until you press that card's **Save**.
+### What saves when
+
+Boxes you type in are saved by their card's **Save**, and keep what you typed while
+you save or flip something else on the same screen. Switches and theme choices apply
+the moment you flip or pick them. The one exception is **Allow other devices on my
+network**, which waits for its card's **Save** (and then for a restart).

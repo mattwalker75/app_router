@@ -8,7 +8,8 @@
 #                   app first if it has not been built (or the code changed). Does
 #                   nothing if it is already running.
 #   -x, --stop      Stop the background server.
-#   -r, --restart   Stop, then start (needed after changing the port or network access).
+#   -r, --restart   Stop, then start (needed after changing a setting marked "Needs restart":
+#                   the port, network access, the sign-in length, where files are kept).
 #   -i, --status    Is it running? Prints the address and process id.
 #   -l, --logs      Follow the server log (Ctrl-C to leave).
 #   -f, --fg        Run in the foreground instead (Ctrl-C to stop).
@@ -61,6 +62,10 @@ node_ok() { command -v node >/dev/null 2>&1 && [[ "$(node -p 'process.versions.n
 AGENT_LABEL="com.app-router.server"
 agent_plist() { if [[ -f "/Library/LaunchDaemons/$AGENT_LABEL.plist" ]]; then echo "/Library/LaunchDaemons/$AGENT_LABEL.plist"; elif [[ -f "$HOME/Library/LaunchAgents/$AGENT_LABEL.plist" ]]; then echo "$HOME/Library/LaunchAgents/$AGENT_LABEL.plist"; fi; }
 autostart() { [[ -z "${AR_NO_AUTOSTART:-}" && -n "$(agent_plist)" ]]; }
+# Does the system have it loaded (so: running, or being started again)? This does not depend on the port,
+# which matters after the port was changed in Settings: the copy that is running still listens on the old one.
+agent_loaded() { local d; if [[ "$(agent_plist)" == /Library/LaunchDaemons/* ]]; then d="system"; else d="gui/$(id -u)"; fi; launchctl print "$d/$AGENT_LABEL" >/dev/null 2>&1; }
+moved_note() { echo "it is not answering at $(url). If the port was changed in Settings, restart to apply it: ./ROUTER.sh --restart"; }
 # Started by the system, the log is kept where macOS always lets a background program write.
 autostart && LOG="$HOME/Library/Logs/app-router.log"
 # Keep the log from growing without end: past 5 MB, keep its last 2000 lines.
@@ -71,7 +76,7 @@ admin_note() { [[ "$(agent_plist)" == /Library/LaunchDaemons/* ]] && info "App R
 # Build when there is no build yet, or when any source file is newer than the last build.
 needs_build() {
   [[ -f "$ENTRY" && -f dist/web/index.html && -f dist/.built ]] || return 0
-  [[ -n "$(find web/src web/index.html server/src shared package.json -newer dist/.built -print -quit 2>/dev/null)" ]]
+  [[ -n "$(find web/src web/public web/index.html server/src shared package.json package-lock.json vite.config.ts tsconfig.server.json web/tsconfig.json -newer dist/.built -print -quit 2>/dev/null)" ]]
 }
 build() {
   info "Building App Router…"
@@ -122,11 +127,11 @@ cmd_start() {
 }
 cmd_stop() {
   if autostart; then
-    answering || { info "Not running. (It starts again when the computer does; ./AUTOSTART.sh --remove ends that.)"; return 0; }
+    answering || agent_loaded || { info "Not running. (It starts again when the computer does; ./AUTOSTART.sh --remove ends that.)"; return 0; }
     admin_note
     ./AUTOSTART.sh --halt >/dev/null 2>&1
-    for _ in $(seq 1 20); do answering || break; sleep 0.25; done
-    answering && { err "It is still answering — see ./AUTOSTART.sh --status"; return 1; }
+    for _ in $(seq 1 20); do answering || agent_loaded || break; sleep 0.25; done
+    { answering || agent_loaded; } && { err "It is still running — see ./AUTOSTART.sh --status"; return 1; }
     ok "Stopped. (It starts again when the computer does; ./AUTOSTART.sh --remove ends that.)"; return 0
   fi
   if running; then
@@ -138,8 +143,10 @@ cmd_stop() {
 }
 cmd_status() {
   if autostart; then
-    if answering; then ok "Running, kept running by the system — $(url)"; else info "Not running (it is set to start with the computer: ./AUTOSTART.sh --status)."; fi
-  elif running; then ok "Running (pid $(cat "$PIDFILE")) — $(url)"
+    if answering; then ok "Running, kept running by the system — $(url)"
+    elif agent_loaded; then warn "Running, kept running by the system — but $(moved_note)"
+    else info "Not running (it is set to start with the computer: ./AUTOSTART.sh --status)."; fi
+  elif running; then if answering; then ok "Running (pid $(cat "$PIDFILE")) — $(url)"; else warn "Running (pid $(cat "$PIDFILE")) — but $(moved_note)"; fi
   elif answering; then ok "Running — $(url)   (not started by this script)"
   else info "Not running."; fi
 }
@@ -147,7 +154,7 @@ cmd_logs() { touch "$LOG"; tail -n 60 -f "$LOG"; }
 # --fg and --dev start a server of their own, so nothing else may hold the port
 busy() {
   if running; then err "Already running in the background (pid $(cat "$PIDFILE")); stop it first: ./ROUTER.sh -x"; return 0; fi
-  if autostart && answering; then err "App Router is running, kept running by the system; stop it first: ./ROUTER.sh -x"; return 0; fi
+  if autostart && { answering || agent_loaded; }; then err "App Router is running, kept running by the system; stop it first: ./ROUTER.sh -x"; return 0; fi
   return 1
 }
 cmd_fg() {

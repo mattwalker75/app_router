@@ -4,13 +4,17 @@ Every setting lives in `config.json`, next to the scripts. **Settings** in the a
 reads and writes the same file, so editing it by hand and editing it in the app change
 the same thing.
 
-The file is read when App Router starts. An edit made by hand while it is running takes
-effect at the next restart; a Save in Settings meanwhile keeps your edit, it does not
-write over it. If the file is not valid JSON when you save in Settings, nothing is
-saved and you are told why.
+The file is read when App Router starts, and again each time something is saved in
+Settings. So an edit made by hand while it is running takes effect at the next restart
+— or, for the settings that apply immediately, at the next Save in Settings, which
+keeps your edit rather than writing over it. If the file is not valid JSON when you
+save in Settings, nothing is saved and you are told why.
 
 - `INSTALL_APP.sh` creates it from `config.example.json`. It is never committed.
 - Missing keys use the defaults below. Unknown keys, including `_comment` notes, are kept.
+- A value of the wrong kind — text where a list or a number belongs, `null` where a
+  group belongs — is ignored and its default used, so a slip of the hand does not stop
+  the app. The file itself is corrected at the next Save in Settings.
 - Paths are relative to the folder `config.json` is in. `~` means your home folder.
 - The file is written with owner-only permissions.
 - To use a different file for a run by hand, set `AR_CONFIG=/path/to/config.json`.

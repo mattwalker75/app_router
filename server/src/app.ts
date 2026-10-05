@@ -64,6 +64,9 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
   // ---------------------------------------------------------------- open routes
   app.get("/api/health", (_req, res) => { res.json({ ok: true, app: "app-router", version: VERSION }); });
   app.get("/api/auth/me", h((req) => users.state(req)));
+  // The look of the page (which theme, and the colours of your own themes) is needed BEFORE signing in,
+  // so the sign-in and create-a-login screens wear the same theme as the rest. Colours only — nothing else.
+  app.get("/api/appearance", h(() => { const a = config.get().appearance; return { theme: a.theme, customThemes: a.customThemes }; }));
   // After the password file was deleted (or on a fresh copy with the login already on): create a login.
   app.post("/api/auth/setup", limiter, h(async (req) => {
     if (!auth.enabled()) throw new UserError("The login is turned off — turn it on in Settings → Access first.", 409);
@@ -95,7 +98,8 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
     const c = config.get();
     return { version: VERSION, auth: users.state(req), config: c, restartRequired: config.restartRequired(), configFile: config.file,
       dataFile: service.dataFile(), iconsDir: service.iconsDir(), passwordFile: auth.file(), hostname: shortHostname(),
-      listening: handle.listening, networkUrls: c.server.allowNetwork ? networkUrls(handle.listening?.port ?? c.server.port) : [] };
+      // the addresses that work NOW: how the server is listening, not a switch that is waiting for a restart
+      listening: handle.listening, networkUrls: (handle.listening ? !handle.listening.localOnlyFilter && !/^(127\.|::1$|localhost$)/.test(handle.listening.host) : c.server.allowNetwork) ? networkUrls(handle.listening?.port ?? c.server.port) : [] };
   }));
 
   // ---------------------------------------------------------------- the page: links, directories, status lights
@@ -143,10 +147,13 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
   // ---------------------------------------------------------------- settings
   app.get("/api/settings", h(() => ({ config: config.get(), restartRequired: config.restartRequired(), configFile: config.file })));
   app.put("/api/settings", h((req) => {
-    const patch = settingsPatch(req.body) as { security?: { passwordFile?: string }; health?: unknown };
-    // the users live in the password file: when its place changes, the file goes with it
-    if (patch.security?.passwordFile !== undefined) auth.moveFile(config.resolve(patch.security.passwordFile));
-    const r = config.update(patch);
+    const patch = settingsPatch(req.body) as { security?: { passwordFile?: string }; data?: { file?: string; iconsDir?: string }; health?: unknown };
+    checkDataPlaces(patch.data, config, service);
+    // the users live in the password file: when its place changes, the file goes with it —
+    // and comes back if the setting could not be saved after all (it must never be in one place and named in another)
+    const undo = patch.security?.passwordFile !== undefined ? auth.moveFile(config.resolve(patch.security.passwordFile)) : null;
+    let r: ReturnType<Config["update"]>;
+    try { r = config.update(patch); } catch (e) { undo?.(); throw e; }
     // new timing, or the master switch back on: start a round now instead of waiting out the old interval
     if (patch.health) health.settingsChanged();
     return { config: config.get(), restartRequired: r.restartRequired, restartNow: r.restartNow };
@@ -175,6 +182,27 @@ export function createApp(config = new Config(), opts: { rateLimit?: boolean } =
   });
 
   return handle;
+}
+
+/**
+ * A new place for the links file or the pictures folder is used at the next start. Refuse now what
+ * would stop that start: a folder where the file should be, a file that is not a links file, a
+ * file where the folder should be.
+ */
+function checkDataPlaces(data: { file?: string; iconsDir?: string } | undefined, config: Config, service: Service): void {
+  if (data?.file !== undefined) {
+    const f = config.resolve(data.file);
+    if (path.resolve(f) !== path.resolve(service.dataFile()) && fs.existsSync(f)) {
+      if (fs.statSync(f).isDirectory()) throw new UserError(`${f} is a folder. The links file needs a file name, for example ${path.join(f, "links.json")}.`, 409);
+      let ok = false; // the same test the app applies when it starts
+      try { const d = JSON.parse(fs.readFileSync(f, "utf8")); ok = !!d && Array.isArray(d.directories) && Array.isArray(d.links); } catch {}
+      if (!ok) throw new UserError(`${f} is another kind of file, not a links file. Choose a place where there is no file yet, or a links file made by App Router.`, 409);
+    }
+  }
+  if (data?.iconsDir !== undefined) {
+    const d = config.resolve(data.iconsDir);
+    if (fs.existsSync(d) && !fs.statSync(d).isDirectory()) throw new UserError(`${d} is a file. The pictures folder must be a folder.`, 409);
+  }
 }
 
 /** Only the settings a person may change, with types checked. The login switch has its own actions (/api/auth/enable, /disable). */

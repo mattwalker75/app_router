@@ -66,12 +66,12 @@ export function BackupSection({ state }: { state: AppState }) {
         )}
       </Card>
       <Card title="Where things are kept" sub="Paths are relative to the folder config.json is in. A changed path is used after a restart; move the files yourself.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <Field label="Links file" htmlFor="b-file" badge={<ApplyBadge restart />} hint={<>Now: <span className="break-all font-mono text-[12.5px]">{state.dataFile}</span></>}>
-            <TextInput id="b-file" className="font-mono !text-[14px]" value={file} onChange={(e) => setFile(e.target.value)} />
+            <TextInput id="b-file" className="font-mono !text-[14px] pointer-coarse:!text-[16px]" value={file} onChange={(e) => setFile(e.target.value)} />
           </Field>
           <Field label="Pictures folder" htmlFor="b-icons" badge={<ApplyBadge restart />} hint={<>Now: <span className="break-all font-mono text-[12.5px]">{state.iconsDir}</span></>}>
-            <TextInput id="b-icons" className="font-mono !text-[14px]" value={icons} onChange={(e) => setIcons(e.target.value)} />
+            <TextInput id="b-icons" className="font-mono !text-[14px] pointer-coarse:!text-[16px]" value={icons} onChange={(e) => setIcons(e.target.value)} />
           </Field>
         </div>
         <div><Button variant="primary" onClick={() => save({ data: { file, iconsDir: icons } })}>Save</Button></div>

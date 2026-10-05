@@ -27,10 +27,13 @@ server/src/
   store.ts      the links file: load, save atomically
   service.ts    every rule about links and directories, pictures, export and import
   health.ts     the health checker and the rules for green / yellow / red / grey
+  util.ts       ids, UserError (a mistake said as a plain sentence), atomic file writes
 shared/
   types.ts      the data model, used by server and page
   address.ts    where a link goes and what a check asks for, worked out the same on both sides
 web/src/
+  main.tsx      starts the page; puts the remembered theme on before anything is drawn
+  index.css     the theme tokens (light and dark) every colour comes from
   App.tsx       theme, sign-in screens or the page; hash routes (#/, #/d/<id>, #/settings/<section>)
   components/   Shell (header), Launchpad (the page + drag and drop), Tiles, LinkDialog,
                 DirectoryDialogs, AuthScreens, ErrorBoundary, ui, confirm
@@ -43,7 +46,7 @@ test/           service, health, api, users, listen, page and scripts suites + h
 
 ```
 browser ──► hostGuard ──► helmet ──► json ──► cookie-session ──► sameOriginWrites
-        ──► /api/health, /api/auth/me|login|setup|logout   (always open)
+        ──► /api/health, /api/appearance, /api/auth/me|login|setup|logout   (always open)
         ──► login gate (401 when the login is on and you are not signed in)
         ──► /api/* routes ──► Service ──► Store (links.json)
                           └─► HealthChecker (status)

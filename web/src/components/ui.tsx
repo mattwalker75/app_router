@@ -1,7 +1,9 @@
 /**
  * Small building blocks used everywhere. Every colour comes from the theme
  * tokens (bg, surface, ink, accent…), so themes restyle all of it. Buttons
- * and fields are 44px tall: comfortable to tap on a phone or tablet.
+ * and fields are 44px tall: comfortable to tap on a phone or tablet. The few
+ * smaller controls grow under a finger (`pointer-coarse:`), and text boxes use
+ * 16px text there — a phone zooms the whole page in when a smaller box is tapped.
  */
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DM from "@radix-ui/react-dropdown-menu";
@@ -24,7 +26,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return (
     <button ref={ref} type="button" disabled={disabled || busy}
       className={cx("inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold whitespace-nowrap transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
-        size === "sm" ? "h-9 px-3 text-[13.5px]" : "h-11 px-4 text-[15px]", VARIANTS[variant], className)} {...rest}>
+        size === "sm" ? "h-9 px-3 text-[13.5px] pointer-coarse:h-10" : "h-11 px-4 text-[15px]", VARIANTS[variant], className)} {...rest}>
       {busy ? <Loader2 size={16} className="animate-spin" /> : icon}{children}
     </button>
   );
@@ -34,13 +36,13 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
   return (
     <button ref={ref} type="button" aria-label={label} title={label}
       className={cx("inline-flex shrink-0 items-center justify-center rounded-[10px] text-ink-2 hover:bg-surface-2 hover:text-ink transition cursor-pointer disabled:opacity-40",
-        bordered && "border border-line bg-surface", size === "sm" ? "h-8 w-8" : "h-11 w-11", className)} {...rest}>
+        bordered && "border border-line bg-surface", size === "sm" ? "h-8 w-8 pointer-coarse:h-10 pointer-coarse:w-10" : "h-11 w-11", className)} {...rest}>
       {children}
     </button>
   );
 });
 
-const field = "w-full rounded-[10px] border border-line-2 bg-surface px-3 text-[15px] text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft";
+const field = "w-full rounded-[10px] border border-line-2 bg-surface px-3 text-[15px] pointer-coarse:text-[16px] text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft";
 export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function TextInput({ className, ...rest }, ref) {
   return <input ref={ref} className={cx(field, "h-11", className)} {...rest} />;
 });
@@ -56,7 +58,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, Omit<InputHTMLAttribut
     <div className="relative">
       <input ref={ref} type={shown ? "text" : "password"} className={cx(field, "h-11 pr-12", className)} {...rest} />
       <button type="button" aria-label={label} title={label} aria-pressed={shown} onClick={() => setShown((v) => !v)}
-        className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-faint transition hover:bg-surface-2 hover:text-ink">
+        className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-faint transition hover:bg-surface-2 hover:text-ink pointer-coarse:h-10 pointer-coarse:w-10">
         {shown ? <EyeOff size={17} /> : <Eye size={17} />}
       </button>
     </div>
@@ -90,7 +92,7 @@ export function ApplyBadge({ restart }: { restart?: boolean }) {
 export function Toggle({ checked, onChange, label, id, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; id?: string; disabled?: boolean }) {
   return (
     <button id={id} type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)}
-      className={cx("relative h-7 w-12 shrink-0 rounded-full transition cursor-pointer disabled:opacity-50", checked ? "bg-accent" : "bg-line-2")}>
+      className={cx("relative h-7 w-12 shrink-0 rounded-full transition cursor-pointer disabled:opacity-50 pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']", checked ? "bg-accent" : "bg-line-2")}>
       <span className={cx("absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all", checked ? "left-[22px]" : "left-0.5")} />
     </button>
   );
@@ -125,11 +127,11 @@ export function Modal({ open, onOpenChange, title, description, children, classN
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[rgb(10_16_24/0.5)]" />
         <Dialog.Content {...(description ? {} : { "aria-describedby": undefined })}
-          className={cx("fixed left-1/2 top-1/2 z-50 max-h-[94vh] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl bg-surface shadow-dialog focus:outline-none",
+          className={cx("fixed left-1/2 top-1/2 z-50 max-h-[94dvh] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl bg-surface shadow-dialog focus:outline-none",
             /(^|\s)!?w-/.test(className || "") ? "" : "w-[min(600px,94vw)]", className)}>
-          <div className="flex items-start gap-3 px-6 pt-5">
+          <div className="flex items-start gap-3 px-4 pt-5 sm:px-6">
             <div className="min-w-0 flex-1">
-              <Dialog.Title className="text-[21px] font-bold leading-tight">{title}</Dialog.Title>
+              <Dialog.Title className="text-[21px] font-bold leading-tight [overflow-wrap:anywhere]">{title}</Dialog.Title>
               {description && <Dialog.Description className="mt-1 text-[14px] text-mute">{description}</Dialog.Description>}
             </div>
             <Dialog.Close asChild><IconButton label="Close" size="sm"><X size={17} /></IconButton></Dialog.Close>
@@ -151,7 +153,7 @@ export function Menu({ trigger, items, align = "end" }: { trigger: ReactNode; it
         <DM.Content align={align} sideOffset={6} className="z-50 min-w-[200px] rounded-xl border border-line bg-surface p-1.5 shadow-lift" onClick={(e) => e.stopPropagation()}>
           {items.map((it, i) => it === "sep" ? <DM.Separator key={i} className="my-1 h-px bg-line" /> : (
             <DM.Item key={i} disabled={it.disabled} onSelect={it.onSelect}
-              className={cx("flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[14.5px] outline-none data-[highlighted]:bg-surface-2 data-[disabled]:opacity-40",
+              className={cx("flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[14.5px] outline-none pointer-coarse:min-h-11 pointer-coarse:text-[15.5px] data-[highlighted]:bg-surface-2 data-[disabled]:opacity-40",
                 it.danger ? "text-danger" : "text-ink")}>
               <span className="flex w-4 justify-center text-current opacity-80">{it.icon}</span>{it.label}
             </DM.Item>

@@ -31,6 +31,8 @@ export interface AppState {
 
 /** Login state — always answered, even before signing in. */
 export const useAuth = () => useQuery({ queryKey: ["auth"], queryFn: () => api.get<AuthState>("/api/auth/me") });
+/** The theme — also answered before signing in, so the sign-in screen can wear it. */
+export const useAppearance = () => useQuery({ queryKey: ["appearance"], queryFn: () => api.get<AppConfig["appearance"]>("/api/appearance") });
 export const useAppState = (enabled = true) => useQuery({ queryKey: ["state"], queryFn: () => api.get<AppState>("/api/state"), enabled });
 /** The links and directories. Asked again every half minute, so a page left open follows changes made from another device. */
 export const usePage = (enabled = true) => useQuery({ queryKey: ["page"], queryFn: () => api.get<PageData>("/api/page"), enabled, refetchInterval: 30_000 });
@@ -44,6 +46,16 @@ export const useStatus = (enabled = true) => useQuery({
 export function useRefresh() {
   const qc = useQueryClient();
   return useCallback(() => qc.invalidateQueries(), [qc]);
+}
+
+/** Is this a touch screen (no mouse to hover with)? Follows a tablet that gets a mouse plugged in. */
+export function useTouchScreen(): boolean {
+  const [touch, setTouch] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)"); const f = () => setTouch(mq.matches);
+    mq.addEventListener("change", f); return () => mq.removeEventListener("change", f);
+  }, []);
+  return touch;
 }
 
 /** Debounce a fast-changing value (the search box). */

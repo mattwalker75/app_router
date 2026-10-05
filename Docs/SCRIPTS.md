@@ -23,7 +23,7 @@ Runs App Router. Options run in the order given; bare words work too
 | --- | --- |
 | `-s`, `--start` | Start in the background and open the page. Builds first if the code changed. The default. |
 | `-x`, `--stop` | Stop it. |
-| `-r`, `--restart` | Stop, then start. Needed after changing the port or network access. |
+| `-r`, `--restart` | Stop, then start. Needed after changing a setting marked **Needs restart**: the port, network access, how long a sign-in lasts, where the links file and the pictures are kept. |
 | `-i`, `--status` | Is it running, and where? |
 | `-l`, `--logs` | Follow `data/router.log`. |
 | `-f`, `--fg` | Run in the foreground. Ctrl-C stops it. |
@@ -38,6 +38,11 @@ It reads the port from `config.json`, and hands that file to the server it start
 - The copy it started is remembered in `data/router.pid`. A number left there from
   before a reboot is not trusted: the process must also be App Router, so `--stop` can
   never stop some other program.
+- After the port is changed in Settings, the copy that is running still listens on the
+  old one until it is restarted. `--status` says so ("running, but not answering at … —
+  restart to apply it") and `--stop` still stops it.
+- It rebuilds when the page's or the server's code, the packages, or the build settings
+  are newer than the last build.
 - `--fg` and `--dev` refuse to start while another copy is running.
 - The log is trimmed to its last 2000 lines when it passes 5 MB.
 

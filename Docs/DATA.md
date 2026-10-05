@@ -42,7 +42,7 @@ file first, so a crash cannot leave half a file.
 
 | Field | Meaning |
 | --- | --- |
-| `id` | A 12-character id made by the app. |
+| `id` | A 12-character id made by the app: lowercase letters and digits only. |
 | `parentId`, `directoryId` | The directory it is in. `null` means the main page. |
 | `position` | Its place among its neighbours, from 0. |
 | `local` | `true`: an app on the same computer, opened by `scheme`, `port` and `path`. `false`: opened by `url`, with `port` as an optional override. |
@@ -59,7 +59,10 @@ overwritten.
 Smaller slips are repaired when it starts: a missing field gets its default, a link
 that names a directory that is not there goes to the main page, a second entry with the
 same `id` or one with no `id` is left out, and directories that contain each other are
-untied. The repaired version is written back at the next change you make on the page.
+untied. An `id` typed by hand with anything but lowercase letters and digits in it gets
+a new one (ids end up in addresses and in the names of picture files), and whatever
+pointed at it follows. A picture name the app did not make is dropped. The repaired
+version is written back at the next change you make on the page.
 
 Directories nest up to 8 deep.
 

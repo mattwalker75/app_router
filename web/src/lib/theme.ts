@@ -25,6 +25,22 @@ export function applyTheme(theme: string, custom: CustomTheme[], preview?: Custo
   root.dataset.theme = theme === "dark" || (theme !== "light" && media?.matches) ? "dark" : "light";
 }
 
+/**
+ * The theme is kept in this browser as well, and put on before the server has answered, so a
+ * reload (or the sign-in screen) does not flash the default look first. Storage can be
+ * unavailable — then the page simply waits for the server.
+ */
+const REMEMBERED = "ar.appearance";
+export function rememberTheme(theme: string, custom: CustomTheme[]): void {
+  try { localStorage.setItem(REMEMBERED, JSON.stringify({ theme, customThemes: custom.filter((t) => t.id === theme) })); } catch {}
+}
+export function applyRememberedTheme(): void {
+  try {
+    const a = JSON.parse(localStorage.getItem(REMEMBERED) || "null") as { theme?: unknown; customThemes?: unknown } | null;
+    if (a && typeof a.theme === "string") applyTheme(a.theme, Array.isArray(a.customThemes) ? (a.customThemes as CustomTheme[]) : []);
+  } catch {}
+}
+
 export function onSystemThemeChange(fn: () => void): () => void {
   media?.addEventListener("change", fn);
   return () => media?.removeEventListener("change", fn);

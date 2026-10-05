@@ -84,6 +84,29 @@ export function deepMerge<T>(base: T, over: unknown): T {
   return out as T;
 }
 
+/**
+ * config.json is edited by hand too. A value of the wrong kind — "extraHosts": "mac.ts.net"
+ * where a list belongs, "server": null — must not take the app down: that key goes back to
+ * its default, and everything else in the file is kept. Keys the app does not know (notes
+ * starting with _, say) are left alone.
+ */
+export function conform<T>(defaults: T, value: unknown): T {
+  if (Array.isArray(defaults)) {
+    if (!Array.isArray(value)) return defaults;
+    // a list of names holds only text; a list of themes holds only groups
+    const kind = defaults.length ? typeof defaults[0] : null;
+    return value.filter((x) => (kind ? typeof x === kind : typeof x === "string" || isObj(x))) as T;
+  }
+  if (isObj(defaults)) {
+    if (!isObj(value)) return defaults;
+    const out: Obj = { ...value };
+    for (const [k, d] of Object.entries(defaults)) out[k] = conform(d, value[k]);
+    return out as T;
+  }
+  if (typeof defaults === "number") return (typeof value === "number" && Number.isFinite(value) ? value : defaults) as T;
+  return (typeof value === typeof defaults ? value : defaults) as T;
+}
+
 function getPath(o: unknown, dotted: string): unknown {
   return dotted.split(".").reduce<unknown>((a, k) => (isObj(a) ? a[k] : undefined), o);
 }
@@ -116,7 +139,9 @@ export class Config {
       try { raw = JSON.parse(fs.readFileSync(this.file, "utf8")); }
       catch (e) { throw new Error(`config.json is not valid JSON (${(e as Error).message}). Fix it or delete it to start from the defaults.`); }
     }
-    this.data = deepMerge(structuredClone(DEFAULTS), raw);
+    this.data = conform(DEFAULTS, deepMerge(structuredClone(DEFAULTS), raw));
+    // a list of themes: only the ones that are whole
+    this.data.appearance.customThemes = this.data.appearance.customThemes.filter((t) => isObj(t) && typeof t.id === "string" && typeof t.name === "string" && isObj(t.tokens));
   }
 
   save(): void {

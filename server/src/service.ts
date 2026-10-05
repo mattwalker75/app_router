@@ -28,6 +28,9 @@ const MAX_DEPTH = 8;
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 export const MAX_ICON_BYTES = 1024 * 1024;
 
+/** The only shape a picture's file name has: <link id>-<8 hex>.<type>. Nothing else is read from or written to the pictures folder. */
+const ICON_NAME = /^[a-z0-9]+-[a-f0-9]{8}\.(png|jpg|webp|gif)$/;
+
 /** What a person sees as one character: "é", "🎬" and a flag each count once. */
 export const characters = (s: string): string[] => [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].map((x) => x.segment);
 
@@ -36,11 +39,12 @@ const byPosition = <T extends { position: number; name: string }>(a: T, b: T) =>
 function text(v: unknown, what: string, max: number, required = false): string {
   const s = String(v ?? "").trim();
   if (required && !s) throw new UserError(`${what} can't be empty.`);
-  if (s.length > max) throw new UserError(`Keep ${what.toLowerCase()} under ${max} characters.`);
+  if (s.length > max && characters(s).length > max) throw new UserError(`Keep ${what.toLowerCase()} to ${max} characters or fewer.`);
   return s;
 }
 function portNumber(v: unknown, what: string): number {
-  const n = Number(v);
+  // a number, or digits typed into a box — not true, not [80], not "0x50"
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d{1,5}$/.test(v.trim()) ? Number(v.trim()) : NaN;
   if (!Number.isInteger(n) || n < 1 || n > 65535) throw new UserError(`${what} must be a whole number from 1 to 65535.`);
   return n;
 }
@@ -50,6 +54,8 @@ export function tidyAddress(raw: unknown): string {
   let s = String(raw ?? "").trim();
   if (!s) throw new UserError("Enter the address the link opens, for example https://example.com.");
   if (s.length > 2000) throw new UserError("That address is too long.");
+  // "mailto:someone@example.com", "ftp:…", "javascript:…" — but not "nas.local:5001", which is a name and a port
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s) && !/^https?:\/\//i.test(s) && !/^[^/?#@]+:\d{1,5}([/?#]|$)/.test(s)) throw new UserError("Only http:// and https:// addresses can be opened from App Router.");
   s = withScheme(s);
   if (!/^https?:\/\//i.test(s)) throw new UserError("Only http:// and https:// addresses can be opened from App Router.");
   let u: URL;
@@ -101,6 +107,21 @@ export class Service {
     const whole = (list: unknown[]) => { const seen = new Set<string>(); return list.filter((x): x is Record<string, unknown> => {
       const id = x && typeof x === "object" ? (x as { id?: unknown }).id : undefined;
       if (typeof id !== "string" || !id || seen.has(id)) return false; seen.add(id); return true; }); };
+    // An id ends up in addresses and in the names of picture files, so it is only ever lowercase
+    // letters and digits. One typed by hand that is anything else gets a new id here, and
+    // whatever pointed at the old one (a parent, a link's directory) follows it.
+    const renamed = new Map<string, string>();
+    const safeIds = (list: unknown[]) => { for (const x of list) {
+      const o = x && typeof x === "object" ? (x as { id?: unknown }) : null;
+      if (o && typeof o.id === "string" && o.id && !/^[a-z0-9]{1,40}$/.test(o.id)) { const fresh = newId(); renamed.set(o.id, fresh); o.id = fresh; }
+    } };
+    safeIds(this.store.directories as unknown[]);
+    for (const x of [...(this.store.directories as unknown[]), ...(this.store.links as unknown[])]) {
+      const o = x && typeof x === "object" ? (x as { parentId?: unknown; directoryId?: unknown }) : null;
+      if (o && typeof o.parentId === "string" && renamed.has(o.parentId)) o.parentId = renamed.get(o.parentId);
+      if (o && typeof o.directoryId === "string" && renamed.has(o.directoryId)) o.directoryId = renamed.get(o.directoryId);
+    }
+    safeIds(this.store.links as unknown[]);
     const rawDirs = whole(this.store.directories as unknown[]);
     const ids = new Set(rawDirs.map((d) => d.id as string));
     const dirs: Directory[] = rawDirs.map((d, i) => ({ id: d.id as string, name: str(d.name).trim() || "Unnamed directory",
@@ -116,7 +137,7 @@ export class Service {
         local: typeof l.local === "boolean" ? l.local : !str(l.url), scheme: l.scheme === "https" ? "https" : "http",
         port: Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null, path: str(l.path), url: str(l.url),
         openIn: l.openIn === "same" ? "same" : "new",
-        icon: { text: str(icon.text), color: /^#[0-9a-f]{6}$/i.test(str(icon.color)) ? str(icon.color).toLowerCase() : "", image: typeof icon.image === "string" && icon.image ? icon.image : null },
+        icon: { text: str(icon.text), color: /^#[0-9a-f]{6}$/i.test(str(icon.color)) ? str(icon.color).toLowerCase() : "", image: typeof icon.image === "string" && ICON_NAME.test(icon.image) ? icon.image : null },
         health: { enabled: health.enabled !== false, path: str(health.path) }, createdAt: when(l.createdAt), updatedAt: when(l.updatedAt) };
     });
     this.store.directories.splice(0, this.store.directories.length, ...dirs);
@@ -245,6 +266,9 @@ export class Service {
       const rawPort = has("port") ? input.port : base && !base.local ? base.port : null;
       port = rawPort === null || rawPort === undefined || String(rawPort).trim() === "" ? null : portNumber(rawPort, "The port");
     }
+    // {"icon": "abc"} or {"health": true} from a script: a plain mistake, said plainly
+    if (input.icon !== undefined && (!input.icon || typeof input.icon !== "object" || Array.isArray(input.icon))) throw new UserError("“icon” must be a group, like {\"icon\": {\"text\": \"AB\"}}.");
+    if (input.health !== undefined && (!input.health || typeof input.health !== "object" || Array.isArray(input.health))) throw new UserError("“health” must be a group, like {\"health\": {\"enabled\": true}}.");
     const iconText = input.icon && "text" in input.icon ? String(input.icon.text ?? "").trim() : base?.icon.text ?? "";
     if (characters(iconText).length > 3) throw new UserError("Keep the tile letters to 3 characters or fewer.");
     let color = input.icon && "color" in input.icon ? String(input.icon.color ?? "").trim().toLowerCase() : base?.icon.color ?? "";
@@ -328,7 +352,7 @@ export class Service {
 
   /** The file for /icons/<name>, or null when there is no such picture. */
   iconFile(name: string): string | null {
-    if (!/^[a-z0-9]+-[a-f0-9]{8}\.(png|jpg|webp|gif)$/.test(name)) return null;
+    if (!ICON_NAME.test(name)) return null;
     const f = path.join(this.iconsDir(), name);
     return fs.existsSync(f) ? f : null;
   }

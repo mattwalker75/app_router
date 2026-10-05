@@ -16,7 +16,7 @@ export function PageSection({ state }: { state: AppState }) {
     <>
       <h1 className="text-[27px] font-bold">Page</h1>
       <Card title="Names" sub="What the page calls itself, and the heading over the links that are not in a directory.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <Field label="Title" htmlFor="p-title" badge={<ApplyBadge />} hint="Shown at the top left and on the browser tab."><TextInput id="p-title" maxLength={40} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           <Field label="Name of the main page" htmlFor="p-root" badge={<ApplyBadge />} hint="The heading over the top-level links — “Apps” to begin with."><TextInput id="p-root" maxLength={40} value={rootName} onChange={(e) => setRootName(e.target.value)} /></Field>
         </div>

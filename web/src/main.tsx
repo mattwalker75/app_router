@@ -7,6 +7,10 @@ import { Toaster } from "sonner";
 import App from "./App";
 import { ConfirmProvider } from "./components/confirm";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { applyRememberedTheme, applyTheme } from "./lib/theme";
+
+// before anything is drawn: the theme this browser saw last, or else the device's own light or dark
+applyTheme("system", []); applyRememberedTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true, retry: (n, e) => n < 1 && !(e as { status?: number }).status } },

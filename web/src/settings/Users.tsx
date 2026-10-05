@@ -31,7 +31,7 @@ function FormModal({ title, description, submitLabel, onClose, action, children,
   };
   return (
     <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title={title} description={description} className="w-[min(460px,94vw)]">
-      <form className="flex flex-col gap-4 px-6 pb-6 pt-4" onSubmit={submit}>
+      <form className="flex flex-col gap-4 px-4 pb-5 pt-4 sm:px-6 sm:pb-6" onSubmit={submit}>
         {children}
         <ErrorLine>{error}</ErrorLine>
         <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>{submitLabel}</Button></div>
@@ -121,7 +121,7 @@ export function UsersCard({ state }: { state: AppState }) {
       <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
         {(users.data?.users ?? []).map((u) => (
           <li key={u.loginName} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-            <span className="min-w-[120px] flex-1 font-semibold">{u.loginName}{u.you && <span className="ml-2 rounded-full bg-accent-softer px-2 py-0.5 text-[12px] font-semibold text-accent-text">you</span>}</span>
+            <span className="min-w-[120px] flex-1 font-semibold [overflow-wrap:anywhere]">{u.loginName}{u.you && <span className="ml-2 rounded-full bg-accent-softer px-2 py-0.5 text-[12px] font-semibold text-accent-text">you</span>}</span>
             {u.you
               ? <Button size="sm" icon={<KeyRound size={15} />} onClick={() => setMine(true)}>Change my password</Button>
               : <>
@@ -134,7 +134,7 @@ export function UsersCard({ state }: { state: AppState }) {
         {users.error && <li className="px-4 py-3 text-danger">{users.error.message}</li>}
       </ul>
       <div><Button icon={<UserPlus size={16} />} onClick={() => setAdding(true)}>Add a user</Button></div>
-      <p className="text-[13.5px] leading-relaxed text-mute">Signed in as <b className="text-ink">{me}</b>. You can't remove yourself — another user can, or turning the login off removes everyone.</p>
+      <p className="text-[13.5px] leading-relaxed text-mute [overflow-wrap:anywhere]">Signed in as <b className="text-ink">{me}</b>. You can't remove yourself — another user can, or turning the login off removes everyone.</p>
       {adding && <AddUser onClose={() => setAdding(false)} />}
       {resetting && <ResetPassword user={resetting} onClose={() => setResetting(null)} />}
       {mine && <ChangeMyPassword onClose={() => setMine(false)} />}

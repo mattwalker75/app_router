@@ -41,9 +41,10 @@ a plain sentence.
    on every password box; deleting the file asks for a new first login and touches nothing
    else. Turning the login on creates the first user in the same step; off needs DISABLE.
    Network access is a separate switch (warn when it is on with the login off).
-7. **Port 80 is the default and must work without sudo.** macOS allows that only on every
-   address, so with network access off `security.listen` binds 0.0.0.0 and drops non-loopback
-   connections. Do not "simplify" this to 127.0.0.1.
+7. **Port 80 is the default and must work without sudo.** macOS allows a low port only on
+   every address, so with network access off `security.listen` tries 127.0.0.1 and, when the
+   system refuses (EACCES), binds 0.0.0.0 and drops non-loopback connections. Do not
+   "simplify" this to 127.0.0.1 alone.
 8. **Every config key is in `config.json` AND in Settings**, marked Applies immediately /
    Needs restart. New key checklist in `Docs/DEVELOPMENT.md`.
 9. **The click after a drop must be cancelled on the document** (`dragGuard` in `Tiles.tsx`):
@@ -63,3 +64,22 @@ a plain sentence.
     health-checked twice at once; `ROUTER.sh` trusts a pid only if that process is App Router.
 13. **Commits**: one per feature with a dated CHANGELOG entry; explicit `git add <paths>`;
     never push — Matt pushes.
+14. **Three sizes, one page** (reviewed Oct 2026 on desktop, tablet and phone; the same
+    approach as people_manager and ai_data_depot). Layout: Tailwind breakpoints — below `lg`
+    the header's search box and light summary get their own line, below `md` Settings shows
+    its sections as a sliding row, below `sm` the header drops the computer's name and the
+    user is an icon. Finger sizes: `pointer-coarse:` (small controls → 40px, text boxes →
+    16px or a phone zooms in). Settings field grids use container queries (`@xl:`), not screen
+    breakpoints. Heights are `dvh`. Long names wrap (`[overflow-wrap:anywhere]`), never push
+    the page sideways. Check 1440 / 820 / 390 wide, with and without touch.
+15. **Nothing may be hover-only.** A link's ⋯ menu has **Details…** (full description, where
+    it opens, where it sits, status + reason + checked address). With changes OFF a mouse gets
+    no ⋯ (hover works); a touch screen keeps the ⋯ with Details alone (`useTouchScreen`).
+16. **The sign-in screen wears the theme** (same as people_manager): open `GET /api/appearance`
+    = `{theme, customThemes}` and nothing else; remembered per browser in `ar.appearance`.
+17. **A second review's fixes that must stay**: the password file is put back if saving its new
+    place fails; path settings refuse a file/folder of the wrong kind; `conform()` in
+    `config.ts` turns a wrong-typed config value back into its default; `repair()` replaces
+    hand-made ids that are not `[a-z0-9]`; `networkUrls` follows how the server IS listening;
+    `ROUTER.sh --status/--stop` find a copy still on the old port; a new screen starts at its
+    top (`scrollTo` on hashchange).
